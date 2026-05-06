@@ -1,10 +1,16 @@
 import apiClient from "./client";
-import type { ReviewTask, ReviewTaskStatus, VerdictValue } from "@/lib/types";
+import type { ReviewTask, ReviewTaskStatus, VerdictValue, GlobalReviewTask } from "@/lib/types";
 
 export const reviewsApi = {
   list: async (tenderId: string, status?: ReviewTaskStatus): Promise<ReviewTask[]> => {
     const params = status ? `?status=${status}` : "";
     const { data } = await apiClient.get<ReviewTask[]>(`/api/tenders/${tenderId}/reviews/${params}`);
+    return data;
+  },
+
+  listAll: async (status?: ReviewTaskStatus): Promise<GlobalReviewTask[]> => {
+    const params = status ? `?status=${status}` : "";
+    const { data } = await apiClient.get<GlobalReviewTask[]>(`/api/reviews/${params}`);
     return data;
   },
 

@@ -67,4 +67,3 @@ backend/storage/tenders/*
 .local/
 .agents/
 attached_assets
-.replit

@@ -1,11 +1,26 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { motion } from "framer-motion";
-import { Cpu, Eye, EyeOff, Shield, FileCheck, Users } from "lucide-react";
+import {
+  Cpu, Eye, EyeOff, Shield, FileCheck, Users, Lock,
+  FileText, ClipboardCheck, Activity, ArrowLeft
+} from "lucide-react";
 import { authApi } from "@/lib/api/auth";
 import { useAuthStore } from "@/lib/stores/authStore";
 import { toast } from "sonner";
+
+const ROLE_CARDS = [
+  { icon: FileText,      label: "Procurement Officer", color: "blue",   desc: "Upload tenders, manage bidders, run evaluations" },
+  { icon: ClipboardCheck,label: "Senior Officer",       color: "purple", desc: "Approve criteria, override verdicts, sign reports" },
+  { icon: Activity,      label: "System Admin",         color: "rose",   desc: "Full access, user management, system config" },
+  { icon: Eye,           label: "Audit Reviewer",       color: "amber",  desc: "Read-only access to audit trail and reports" },
+];
+
+const COLOR_DOT: Record<string, string> = {
+  blue: "bg-blue-500", purple: "bg-purple-500", rose: "bg-rose-500", amber: "bg-amber-500",
+};
 
 export default function LoginPage() {
   const router = useRouter();
@@ -20,14 +35,11 @@ export default function LoginPage() {
     setLoading(true);
     try {
       const token = await authApi.login(username, password);
-      const user = await (async () => {
-        const { default: apiClient } = await import("@/lib/api/client");
-        apiClient.defaults.headers.common["Authorization"] = `Bearer ${token.access_token}`;
-        localStorage.setItem("tg_token", token.access_token);
-        const { data } = await apiClient.get("/api/auth/me");
-        return data;
-      })();
-      setAuth(token.access_token, user);
+      const { default: apiClient } = await import("@/lib/api/client");
+      apiClient.defaults.headers.common["Authorization"] = `Bearer ${token.access_token}`;
+      localStorage.setItem("tg_token", token.access_token);
+      const { data } = await apiClient.get("/api/auth/me");
+      setAuth(token.access_token, data);
       toast.success("Signed in successfully");
       router.push("/dashboard");
     } catch {
@@ -40,34 +52,36 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen bg-[#0f172a] flex">
       {/* Left panel */}
-      <div className="hidden lg:flex w-[480px] flex-col justify-between p-10 border-r border-[#1e293b]">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-blue-600 flex items-center justify-center">
-            <Cpu className="w-5 h-5 text-white" />
-          </div>
-          <div>
-            <div className="text-white font-bold text-base">TenderGraph AI+</div>
-            <div className="text-blue-400 text-[11px] tracking-widest font-medium">PROCUREMENT INTELLIGENCE</div>
-          </div>
-        </div>
+      <div className="hidden lg:flex w-[520px] flex-col justify-between p-10 border-r border-[#1e293b] bg-[#0a1120]">
+        <div>
+          <Link href="/" className="flex items-center gap-2.5 mb-10 hover:opacity-80 transition-opacity">
+            <div className="w-9 h-9 rounded-xl bg-blue-600 flex items-center justify-center">
+              <Cpu className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <div className="text-white font-bold text-base leading-tight">TenderGraph AI+</div>
+              <div className="text-blue-400 text-[10px] tracking-widest font-semibold">PROCUREMENT INTELLIGENCE</div>
+            </div>
+          </Link>
 
-        <div className="space-y-8">
-          <div>
-            <h2 className="text-white text-2xl font-bold leading-snug mb-3">
-              Explainable AI for<br />Government Procurement
-            </h2>
-            <p className="text-slate-400 text-sm leading-relaxed">
-              AI extracts. Rules decide. Humans review. Every action is immutably audited.
-            </p>
-          </div>
-          <div className="space-y-4">
+          <h2 className="text-white text-2xl font-bold leading-snug mb-3">
+            Explainable AI for<br />Government Procurement
+          </h2>
+          <p className="text-slate-400 text-sm leading-relaxed mb-8">
+            AI extracts structured evidence from tender and bidder documents.
+            A deterministic rule engine makes every eligibility decision.
+            Every action is immutably audited.
+          </p>
+
+          <div className="space-y-3 mb-8">
             {[
-              { icon: FileCheck, label: "Criterion-Level Explainability", desc: "Every verdict traces to a specific document page and clause" },
-              { icon: Shield, label: "Tamper-Evident Audit Trail", desc: "SHA-256 hash-chained event log, verifiable by any auditor" },
-              { icon: Users, label: "Zero Silent Disqualifications", desc: "Uncertain cases always escalated to human review" },
+              { icon: FileCheck, label: "Criterion-Level Explainability",  desc: "Every verdict traces to a specific document page and clause" },
+              { icon: Shield,    label: "Tamper-Evident Audit Trail",       desc: "SHA-256 hash-chained event log, verifiable by any auditor" },
+              { icon: Users,     label: "Zero Silent Disqualifications",    desc: "Uncertain extractions always escalated to human review" },
+              { icon: Lock,      label: "Deterministic Rule Engine",        desc: "AI extracts — rules decide — never probabilistic verdicts" },
             ].map(({ icon: Icon, label, desc }) => (
               <div key={label} className="flex gap-3">
-                <div className="w-8 h-8 rounded-lg bg-[#1e293b] flex items-center justify-center flex-shrink-0 mt-0.5">
+                <div className="w-8 h-8 rounded-lg bg-[#1e293b] flex items-center justify-center flex-shrink-0">
                   <Icon className="w-4 h-4 text-blue-400" />
                 </div>
                 <div>
@@ -77,9 +91,26 @@ export default function LoginPage() {
               </div>
             ))}
           </div>
+
+          {/* Role legend */}
+          <div className="bg-[#1e293b]/60 border border-[#334155] rounded-xl p-4">
+            <p className="text-[10px] text-slate-500 uppercase tracking-widest font-semibold mb-3">Access Roles</p>
+            <div className="grid grid-cols-2 gap-2">
+              {ROLE_CARDS.map(({ icon: Icon, label, color, desc }) => (
+                <div key={label} className="flex items-start gap-2">
+                  <div className={`w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0 ${COLOR_DOT[color]}`} />
+                  <div>
+                    <div className="text-slate-200 text-[11px] font-medium">{label}</div>
+                    <div className="text-slate-500 text-[10px]">{desc}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
 
-        <div className="text-slate-600 text-xs">
+        <div className="text-slate-600 text-xs flex items-center gap-2">
+          <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
           CRPF Government Procurement · Theme 3 · Hackathon Submission
         </div>
       </div>
@@ -92,15 +123,29 @@ export default function LoginPage() {
           transition={{ duration: 0.4 }}
           className="w-full max-w-sm"
         >
-          <div className="lg:hidden flex items-center gap-2 mb-8">
-            <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center">
-              <Cpu className="w-4 h-4 text-white" />
+          {/* Mobile logo */}
+          <div className="lg:hidden mb-8">
+            <Link href="/" className="flex items-center gap-2 mb-6 hover:opacity-80 transition-opacity">
+              <ArrowLeft className="w-4 h-4 text-slate-400" />
+              <span className="text-slate-400 text-xs">Back to home</span>
+            </Link>
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center">
+                <Cpu className="w-4 h-4 text-white" />
+              </div>
+              <span className="text-white font-bold">TenderGraph AI+</span>
             </div>
-            <span className="text-white font-bold">TenderGraph AI+</span>
           </div>
 
-          <h2 className="text-white text-xl font-bold mb-1">Sign in</h2>
-          <p className="text-slate-400 text-sm mb-7">Access your procurement workspace</p>
+          {/* Desktop back link */}
+          <div className="hidden lg:block mb-6">
+            <Link href="/" className="flex items-center gap-1.5 text-slate-500 hover:text-slate-300 text-xs transition-colors">
+              <ArrowLeft className="w-3 h-3" /> Back to home
+            </Link>
+          </div>
+
+          <h2 className="text-white text-2xl font-bold mb-1">Welcome back</h2>
+          <p className="text-slate-400 text-sm mb-8">Sign in to your procurement workspace</p>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
@@ -109,9 +154,10 @@ export default function LoginPage() {
                 type="text"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                className="w-full bg-[#1e293b] border border-[#334155] text-white placeholder-slate-600 rounded-lg px-3.5 py-2.5 text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
-                placeholder="officer_demo"
+                className="w-full bg-[#1e293b] border border-[#334155] text-white placeholder-slate-600 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/40 transition-all"
+                placeholder="e.g. officer_demo"
                 required
+                autoFocus
               />
             </div>
             <div>
@@ -121,20 +167,21 @@ export default function LoginPage() {
                   type={showPw ? "text" : "password"}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full bg-[#1e293b] border border-[#334155] text-white placeholder-slate-600 rounded-lg px-3.5 py-2.5 text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all pr-10"
+                  className="w-full bg-[#1e293b] border border-[#334155] text-white placeholder-slate-600 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/40 transition-all pr-10"
                   placeholder="••••••••"
                   required
                 />
                 <button type="button" onClick={() => setShowPw(!showPw)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300">
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300 transition-colors">
                   {showPw ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
             </div>
+
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-blue-600 hover:bg-blue-500 disabled:opacity-60 text-white font-semibold py-2.5 rounded-lg text-sm transition-all flex items-center justify-center gap-2"
+              className="w-full bg-blue-600 hover:bg-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold py-2.5 rounded-xl text-sm transition-all flex items-center justify-center gap-2 mt-2"
             >
               {loading ? (
                 <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Signing in…</>
@@ -142,18 +189,38 @@ export default function LoginPage() {
             </button>
           </form>
 
-          <div className="mt-6 p-3.5 rounded-lg border border-[#1e293b] bg-[#0d1829]">
-            <p className="text-[11px] text-slate-500 mb-2 font-medium">Demo credentials</p>
-            <div className="space-y-1">
-              <div className="flex justify-between text-[11px]">
-                <span className="text-slate-500">Username</span>
-                <span className="text-slate-300 font-mono">officer_demo</span>
-              </div>
-              <div className="flex justify-between text-[11px]">
-                <span className="text-slate-500">Password</span>
-                <span className="text-slate-300 font-mono">SecurePass@123</span>
-              </div>
+          <div className="mt-6 text-center">
+            <span className="text-slate-500 text-xs">Don&apos;t have an account? </span>
+            <Link href="/register" className="text-blue-400 hover:text-blue-300 text-xs font-medium transition-colors">
+              Register here
+            </Link>
+          </div>
+
+          {/* Demo credentials */}
+          <div className="mt-6 p-4 rounded-xl border border-[#1e293b] bg-[#0d1829]">
+            <p className="text-[11px] text-slate-500 mb-2.5 font-semibold uppercase tracking-wide">Demo Credentials</p>
+            <div className="space-y-1.5">
+              {[
+                { label: "Username", value: "officer_demo" },
+                { label: "Password", value: "SecurePass@123" },
+              ].map(({ label, value }) => (
+                <div key={label} className="flex justify-between items-center">
+                  <span className="text-slate-500 text-[11px]">{label}</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (label === "Username") setUsername(value);
+                      else setPassword(value);
+                    }}
+                    className="text-slate-300 font-mono text-[11px] hover:text-white transition-colors cursor-pointer"
+                    title={`Click to fill ${label.toLowerCase()}`}
+                  >
+                    {value}
+                  </button>
+                </div>
+              ))}
             </div>
+            <p className="text-[10px] text-slate-600 mt-2">Click value to auto-fill field</p>
           </div>
         </motion.div>
       </div>

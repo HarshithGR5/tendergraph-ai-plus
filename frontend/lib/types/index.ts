@@ -157,6 +157,11 @@ export interface ReviewTask {
   resolution_verdict: VerdictValue | null;
 }
 
+export interface GlobalReviewTask extends ReviewTask {
+  tender_id: string | null;
+  tender_title: string | null;
+}
+
 export type AuditEventType =
   | "CRITERION_EXTRACTED" | "EVIDENCE_EXTRACTED" | "VERDICT_EMITTED"
   | "HUMAN_REVIEW_ASSIGNED" | "HUMAN_OVERRIDE_APPLIED" | "REPORT_EXPORTED"
