@@ -128,9 +128,22 @@ def extract_evidence_for_criterion(
             model=settings.llm_model,
             messages=[{"role": "user", "content": prompt}],
             max_tokens=1024,
-            response_format={"type": "json_object"},
+            temperature=0,
         )
         raw = response.choices[0].message.content
+        if not raw:
+            raise ValueError("LLM returned empty response")
+
+        raw = raw.strip()
+
+        # Remove markdown fences if present
+        raw = re.sub(r"^```json\s*", "", raw)
+        raw = re.sub(r"^```\s*", "", raw)
+        raw = re.sub(r"\s*```$", "", raw)
+
+        print("\n===== EVIDENCE RAW RESPONSE =====\n")
+        print(raw)
+        print("\n=================================\n")
         result = json.loads(raw)
     except Exception as e:
         logger.error(f"Evidence extraction LLM call failed: {e}")

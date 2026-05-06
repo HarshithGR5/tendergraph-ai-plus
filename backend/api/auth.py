@@ -47,11 +47,19 @@ class UserOut(BaseModel):
 
 
 def verify_password(plain: str, hashed: str) -> bool:
-    return pwd_context.verify(plain, hashed)
+    # bcrypt max password length = 72 bytes
+    return pwd_context.verify(plain[:72], hashed)
 
 
 def hash_password(password: str) -> str:
-    return pwd_context.hash(password)
+    # bcrypt max password length = 72 bytes
+    if len(password.encode("utf-8")) > 72:
+        raise HTTPException(
+            status_code=400,
+            detail="Password must be 72 bytes or fewer."
+        )
+
+    return pwd_context.hash(password[:72])
 
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:

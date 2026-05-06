@@ -1,9 +1,17 @@
 import os
+from pathlib import Path
+from dotenv import load_dotenv
 from sqlalchemy import create_engine, event
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
+# Explicitly load backend/.env
+env_path = Path(__file__).resolve().parent / ".env"
+load_dotenv(dotenv_path=env_path)
+
 DATABASE_URL = os.getenv("DATABASE_URL", "")
+
+print("Loaded DATABASE_URL:", DATABASE_URL)  # temporary debug
 
 if not DATABASE_URL:
     raise RuntimeError("DATABASE_URL environment variable is not set.")

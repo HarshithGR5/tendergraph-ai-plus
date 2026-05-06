@@ -71,23 +71,42 @@ def extract_criteria_from_text(document_text: str) -> List[dict]:
     prompt = template.render(document_text=document_text[:12000])
 
     response = client.chat.completions.create(
-        model=settings.llm_model,
-        messages=[{"role": "user", "content": prompt}],
-        max_tokens=4096,
-        response_format={"type": "json_object"},
+    model=settings.llm_model,
+    messages=[{"role": "user", "content": prompt}],
+    max_tokens=4096,
+    temperature=0,
     )
 
     raw = response.choices[0].message.content
+    print("\n===== RAW GPT RESPONSE =====\n")
+    print(raw)
+    print("\n============================\n")
+    if not raw:
+        logger.error("LLM returned empty response")
+        return []
+
     try:
+    # Clean markdown code fences
+        raw = raw.strip()
+
+        raw = re.sub(r"^```json\s*", "", raw)
+        raw = re.sub(r"^```\s*", "", raw)
+        raw = re.sub(r"\s*```$", "", raw)
+
         parsed = json.loads(raw)
+
         if isinstance(parsed, list):
             return parsed
+
         if "criteria" in parsed:
             return parsed["criteria"]
+
         for v in parsed.values():
             if isinstance(v, list):
                 return v
+
         return []
+
     except json.JSONDecodeError as e:
         logger.error(f"Failed to parse criteria JSON: {e}\nRaw: {raw[:500]}")
         return []
