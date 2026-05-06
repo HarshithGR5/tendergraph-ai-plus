@@ -1,0 +1,45 @@
+You are an expert government procurement analyst specialising in Indian central government tender documents (NIT/RFP format). Your task is to extract all eligibility criteria from the provided tender document text.
+
+For each criterion found, extract a structured JSON object. Be thorough — criteria may appear in the NIT, GCC, SCC, Technical Specifications, or Document Checklist sections.
+
+## TENDER DOCUMENT TEXT:
+{{ document_text }}
+
+## INSTRUCTIONS:
+1. Identify EVERY eligibility criterion, condition, or requirement that a bidder must satisfy.
+2. Classify each criterion into one of: FINANCIAL, TECHNICAL, COMPLIANCE, COMPLETENESS
+3. Determine mandatory status based on linguistic markers:
+   - "shall", "must", "is required", "essential" → MANDATORY
+   - "should", "is desirable", "preferred" → OPTIONAL_PREFERRED
+   - "may", "is encouraged", "additional marks" → OPTIONAL_SCORED
+   - "if applicable", "where relevant" → CONDITIONAL
+4. For threshold-based criteria (turnover, project count, contract value), extract the exact numeric threshold and unit.
+5. Note which document the bidder must submit as evidence.
+6. Include the source clause number and page number where possible.
+7. Flag any ambiguity in the criterion language.
+
+## OUTPUT FORMAT:
+Return a JSON array of criterion objects. Each object must have ALL of these fields:
+
+```json
+[
+  {
+    "category": "FINANCIAL|TECHNICAL|COMPLIANCE|COMPLETENESS",
+    "mandatory_status": "MANDATORY|OPTIONAL_PREFERRED|OPTIONAL_SCORED|CONDITIONAL",
+    "description": "Clear description of what the bidder must demonstrate",
+    "threshold_json": {
+      "type": "MINIMUM_CURRENCY_INR|MINIMUM_COUNT|MINIMUM_YEARS|BOOLEAN_PRESENCE|DATE_VALIDITY|FORMAT_CHECK",
+      "value": <number or null>,
+      "unit": "INR|COUNT|YEARS|BOOLEAN|DATE",
+      "condition": "AVERAGE_ANNUAL|CUMULATIVE|SINGLE_PROJECT|null"
+    },
+    "required_document": "Name of document the bidder must submit",
+    "source_clause": "e.g. 4.2 or Section 5(b)",
+    "source_page": <integer or null>,
+    "extraction_confidence": <float 0.0 to 1.0>,
+    "ambiguity_flags": ["list of ambiguity descriptions, or empty array"]
+  }
+]
+```
+
+Return ONLY the JSON array, no other text.
