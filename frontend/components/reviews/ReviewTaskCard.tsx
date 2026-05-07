@@ -5,16 +5,20 @@ import { AlertTriangle, User, Clock, CheckCircle, XCircle, MessageSquare } from 
 import { VerdictBadge, StatusBadge } from "@/components/ui/badge";
 import { formatDateTime, cn } from "@/lib/utils";
 import { reviewsApi } from "@/lib/api/reviews";
+import { useAuthStore } from "@/lib/stores/authStore";
 import { toast } from "sonner";
 import type { ReviewTask, VerdictValue } from "@/lib/types";
 
 interface Props { task: ReviewTask; tenderId: string; onUpdated: (t: ReviewTask) => void; }
 
 export function ReviewTaskCard({ task, tenderId, onUpdated }: Props) {
+  const { user } = useAuthStore();
   const [resolving, setResolving] = useState(false);
   const [notes, setNotes] = useState("");
   const [showResolve, setShowResolve] = useState(false);
   const [assigning, setAssigning] = useState(false);
+
+  const canResolve = user?.role === "SENIOR_OFFICER" || user?.role === "SYSTEM_ADMIN";
 
   async function assign() {
     setAssigning(true);
@@ -88,16 +92,19 @@ export function ReviewTaskCard({ task, tenderId, onUpdated }: Props) {
                 <User className="w-3 h-3" /> {assigning ? "…" : "Assign to Me"}
               </button>
             )}
-            {task.status !== "OPEN" && (
+            {task.status !== "OPEN" && canResolve && (
               <button onClick={() => setShowResolve(!showResolve)}
                 className="flex items-center gap-1.5 text-xs px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-medium transition-colors">
                 <MessageSquare className="w-3 h-3" /> {showResolve ? "Cancel" : "Resolve"}
               </button>
             )}
+            {task.status !== "OPEN" && !canResolve && (
+              <span className="text-[11px] text-slate-400 italic py-1.5">Senior Officer approval required to resolve</span>
+            )}
           </div>
         )}
 
-        {showResolve && (
+        {showResolve && canResolve && (
           <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }}
             className="mt-3 space-y-2">
             <textarea value={notes} onChange={(e) => setNotes(e.target.value)}

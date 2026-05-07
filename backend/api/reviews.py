@@ -5,10 +5,10 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from backend.api.auth import get_current_user
+from backend.api.auth import get_current_user, require_role
 from backend.database import get_db
 from backend.models.tables import (
-    AuditEventType, Bidder, ReviewTask, ReviewTaskStatus, Tender, User, VerdictValue
+    AuditEventType, Bidder, ReviewTask, ReviewTaskStatus, Tender, User, UserRole, VerdictValue
 )
 from backend.services import audit_service
 
@@ -40,12 +40,15 @@ class ResolvePayload(BaseModel):
     resolution_notes: str
 
 
+# ── List review tasks: procurement + senior + admin ────────────────────────────
 @router.get("/", response_model=List[ReviewTaskOut])
 def list_review_tasks(
     tender_id: str,
     status: Optional[ReviewTaskStatus] = None,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_role(
+        UserRole.PROCUREMENT_OFFICER, UserRole.SENIOR_OFFICER, UserRole.SYSTEM_ADMIN
+    )),
 ):
     tender = db.query(Tender).filter(Tender.tender_id == tender_id).first()
     if not tender:
@@ -72,12 +75,15 @@ def list_review_tasks(
     return results
 
 
+# ── Assign: procurement + senior + admin can assign tasks ─────────────────────
 @router.post("/{task_id}/assign", response_model=ReviewTaskOut)
 def assign_task(
     tender_id: str,
     task_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_role(
+        UserRole.PROCUREMENT_OFFICER, UserRole.SENIOR_OFFICER, UserRole.SYSTEM_ADMIN
+    )),
 ):
     task = db.query(ReviewTask).filter(ReviewTask.task_id == task_id).first()
     if not task:
@@ -99,13 +105,14 @@ def assign_task(
     return out
 
 
+# ── Resolve/override: Senior Officer + Admin ONLY ─────────────────────────────
 @router.post("/{task_id}/resolve", response_model=ReviewTaskOut)
 def resolve_task(
     tender_id: str,
     task_id: str,
     payload: ResolvePayload,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_role(UserRole.SENIOR_OFFICER, UserRole.SYSTEM_ADMIN)),
 ):
     task = db.query(ReviewTask).filter(ReviewTask.task_id == task_id).first()
     if not task:

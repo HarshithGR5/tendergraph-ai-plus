@@ -8,7 +8,7 @@ from fastapi.responses import JSONResponse
 
 from backend.config import settings
 from backend.database import Base, engine
-from backend.api import auth, tenders, bidders, verdicts, reviews, reports, audit, global_reviews, global_audit
+from backend.api import auth, tenders, bidders, verdicts, reviews, reports, audit, global_reviews, global_audit, bidder_portal
 
 logging.basicConfig(
     level=logging.INFO,
@@ -52,6 +52,7 @@ app.include_router(reports.router, prefix=API_PREFIX)
 app.include_router(audit.router, prefix=API_PREFIX)
 app.include_router(global_reviews.router, prefix=API_PREFIX)
 app.include_router(global_audit.router, prefix=API_PREFIX)
+app.include_router(bidder_portal.router, prefix=API_PREFIX)
 
 
 

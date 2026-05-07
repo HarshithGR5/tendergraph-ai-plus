@@ -5,9 +5,9 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from backend.api.auth import get_current_user
+from backend.api.auth import get_current_user, require_role
 from backend.database import get_db
-from backend.models.tables import Bidder, ReviewTask, ReviewTaskStatus, Tender, User, VerdictValue
+from backend.models.tables import Bidder, ReviewTask, ReviewTaskStatus, Tender, User, UserRole, VerdictValue
 
 router = APIRouter(prefix="/reviews", tags=["reviews-global"])
 
@@ -34,11 +34,14 @@ class GlobalReviewTaskOut(BaseModel):
         from_attributes = True
 
 
+# ── Global review queue: internal staff only (not bidders) ────────────────────
 @router.get("/", response_model=List[GlobalReviewTaskOut])
 def list_all_review_tasks(
     status: Optional[ReviewTaskStatus] = None,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_role(
+        UserRole.PROCUREMENT_OFFICER, UserRole.SENIOR_OFFICER, UserRole.SYSTEM_ADMIN
+    )),
 ):
     query = (
         db.query(ReviewTask)

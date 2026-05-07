@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import {
   Cpu, Shield, FileCheck, Users, ArrowRight, CheckCircle,
   Brain, BarChart3, Lock, Eye, ChevronRight, GitBranch,
-  FileText, AlertTriangle, ClipboardCheck, Activity
+  FileText, AlertTriangle, ClipboardCheck, Activity, Building2
 } from "lucide-react";
 
 const FEATURES = [
@@ -24,7 +24,7 @@ const FEATURES = [
     icon: Lock,
     color: "purple",
     title: "Tamper-Evident Audit Trail",
-    desc: "SHA-256 hash-chained event log. Every automated and human action is cryptographically sealed. Verifiable by the CVC, High Courts, or any external auditor.",
+    desc: "SHA-256 hash-chained event log. Every automated and human action is cryptographically sealed. Verifiable by regulators, oversight bodies, or any external auditor.",
   },
   {
     icon: AlertTriangle,
@@ -36,7 +36,7 @@ const FEATURES = [
     icon: Users,
     color: "teal",
     title: "Role-Based Access Control",
-    desc: "Four distinct roles — Procurement Officer, Senior Officer, System Admin, Audit Reviewer — each with precisely scoped permissions aligned to government procurement hierarchy.",
+    desc: "Five distinct roles — Bidder, Procurement Officer, Senior Officer, System Admin, Audit Reviewer — each with precisely scoped permissions aligned to enterprise procurement hierarchy.",
   },
   {
     icon: BarChart3,
@@ -47,25 +47,36 @@ const FEATURES = [
 ];
 
 const WORKFLOW = [
-  { step: "01", label: "Upload Tender", desc: "PDF, DOCX, or scanned document. AI extracts all eligibility criteria automatically." },
-  { step: "02", label: "Review Criteria", desc: "Officer reviews and approves the AI-extracted criteria schema before evaluation begins." },
-  { step: "03", label: "Register Bidders", desc: "Upload bidder submission packages. OCR pipeline processes every document format." },
+  { step: "01", label: "Upload Tender", desc: "Senior Officer uploads the tender document. AI extracts all eligibility criteria automatically." },
+  { step: "02", label: "Approve Criteria", desc: "Senior Officer reviews and approves the AI-extracted criteria schema before evaluation begins." },
+  { step: "03", label: "Bidders Register", desc: "Bidder companies self-register and upload their submission packages. OCR pipeline processes every document format." },
   { step: "04", label: "AI Evaluation", desc: "Rule engine applies deterministic checks on extracted evidence. Verdicts emitted per criterion." },
-  { step: "05", label: "Human Review & Report", desc: "Ambiguous cases queued for officer decision. Signed PDF evaluation report generated." },
+  { step: "05", label: "Human Review & Report", desc: "Ambiguous cases queued for Senior Officer decision. Signed PDF evaluation report generated." },
 ];
 
 const ROLES = [
+  {
+    role: "Bidder",
+    badge: "BIDDER",
+    color: "teal",
+    icon: Building2,
+    permissions: [
+      "Self-register to any open tender",
+      "Upload own company documents",
+      "Track submission status",
+      "View own evaluation outcome",
+    ],
+  },
   {
     role: "Procurement Officer",
     badge: "PROCUREMENT_OFFICER",
     color: "blue",
     icon: FileText,
     permissions: [
-      "Upload and manage tender documents",
-      "Register bidders and upload submissions",
+      "View all tenders and bidder lists",
       "Trigger AI evaluation pipeline",
-      "View and download evaluation reports",
-      "Complete manual review tasks",
+      "Assign and work review tasks",
+      "Download evaluation reports",
     ],
   },
   {
@@ -74,11 +85,10 @@ const ROLES = [
     color: "purple",
     icon: ClipboardCheck,
     permissions: [
-      "All Procurement Officer permissions",
+      "Upload and manage tender documents",
       "Approve extracted criteria schemas",
       "Override AI verdicts with logged reason",
       "Sign and countersign evaluation reports",
-      "Assign review tasks to junior officers",
     ],
   },
   {
@@ -90,8 +100,7 @@ const ROLES = [
       "All Senior Officer permissions",
       "Create and manage user accounts",
       "Configure system-wide thresholds",
-      "Access full audit trail across all tenders",
-      "Export tamper-evident audit JSON for CVC",
+      "Export tamper-evident audit data",
     ],
   },
   {
@@ -103,7 +112,6 @@ const ROLES = [
       "Read-only access to all tenders",
       "View complete audit event log",
       "Verify SHA-256 hash chain integrity",
-      "Export audit trail for external review",
       "Cannot modify any data or verdicts",
     ],
   },
@@ -136,8 +144,8 @@ export default function LandingPage() {
           </div>
           <div className="flex items-center gap-3">
             <Link href="/presentation"
-              className="text-slate-400 hover:text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-[#1e293b] transition-colors">
-              Presentation
+              className="text-slate-300 hover:text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-[#1e293b] transition-colors">
+              Platform Overview
             </Link>
             <Link href="/login"
               className="text-slate-300 hover:text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-[#1e293b] transition-colors">
@@ -160,7 +168,7 @@ export default function LandingPage() {
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }}>
             <div className="inline-flex items-center gap-2 bg-blue-950 border border-blue-800 text-blue-300 text-xs font-medium px-3 py-1.5 rounded-full mb-6">
               <span className="w-1.5 h-1.5 bg-blue-400 rounded-full animate-pulse" />
-              CRPF · Theme 3 · Government Procurement AI
+              Enterprise Procurement Intelligence Platform
             </div>
 
             <h1 className="text-4xl md:text-6xl font-extrabold leading-tight mb-6 tracking-tight">
@@ -296,10 +304,10 @@ export default function LandingPage() {
         <div className="text-center mb-12">
           <h2 className="text-3xl font-bold text-white mb-3">Role-Based Access Tiers</h2>
           <p className="text-slate-400 text-sm max-w-xl mx-auto">
-            Four distinct roles aligned to government procurement hierarchy — each with precisely scoped permissions.
+            Five distinct roles — from Bidder to System Admin — each with precisely scoped permissions aligned to enterprise procurement hierarchy.
           </p>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
           {ROLES.map(({ role, badge, color, icon: Icon, permissions }) => {
             const c = colorMap[color];
             return (
@@ -355,7 +363,7 @@ export default function LandingPage() {
             <div className="w-6 h-6 rounded-md bg-blue-600 flex items-center justify-center">
               <Cpu className="w-3 h-3 text-white" />
             </div>
-            <span className="text-slate-500 text-xs">TenderGraph AI+ · CRPF Government Procurement · Theme 3</span>
+            <span className="text-slate-500 text-xs">TenderGraph AI+ · Enterprise Procurement Intelligence</span>
           </div>
           <div className="flex items-center gap-4 text-xs text-slate-600">
             <span>AI Extraction · Rule Engine · Human Review · Audit Trail</span>

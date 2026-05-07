@@ -5,12 +5,12 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, field_validator
 from sqlalchemy.orm import Session
 
-from backend.api.auth import get_current_user
+from backend.api.auth import get_current_user, require_role
 from backend.config import settings
 from backend.database import get_db
 from backend.models.tables import (
     AuditEventType, Bidder, CriterionVerdict, OverallVerdict,
-    ReviewTask, ReviewTaskStatus, Tender, User, VerdictValue
+    ReviewTask, ReviewTaskStatus, Tender, User, UserRole, VerdictValue
 )
 from backend.services import audit_service
 
@@ -65,12 +65,15 @@ class OverridePayload(BaseModel):
         return v.strip()
 
 
+# ── Verdicts: internal staff only ─────────────────────────────────────────────
 @router.get("/verdicts", response_model=List[VerdictOut])
 def list_verdicts(
     tender_id: str,
     bidder_id: Optional[str] = None,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_role(
+        UserRole.PROCUREMENT_OFFICER, UserRole.SENIOR_OFFICER, UserRole.SYSTEM_ADMIN, UserRole.AUDIT_REVIEWER
+    )),
 ):
     tender = db.query(Tender).filter(Tender.tender_id == tender_id).first()
     if not tender:
@@ -87,7 +90,9 @@ def list_verdicts(
 def get_evaluation_matrix(
     tender_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_role(
+        UserRole.PROCUREMENT_OFFICER, UserRole.SENIOR_OFFICER, UserRole.SYSTEM_ADMIN, UserRole.AUDIT_REVIEWER
+    )),
 ):
     tender = db.query(Tender).filter(Tender.tender_id == tender_id).first()
     if not tender:
@@ -103,6 +108,7 @@ def get_evaluation_matrix(
     return rows
 
 
+# ── Override: Senior Officer + Admin only ─────────────────────────────────────
 @router.post("/bidders/{bidder_id}/verdicts/{verdict_id}/override", response_model=VerdictOut)
 def override_verdict(
     tender_id: str,
@@ -110,7 +116,7 @@ def override_verdict(
     verdict_id: str,
     payload: OverridePayload,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_role(UserRole.SENIOR_OFFICER, UserRole.SYSTEM_ADMIN)),
 ):
     verdict = db.query(CriterionVerdict).filter(
         CriterionVerdict.verdict_id == verdict_id,

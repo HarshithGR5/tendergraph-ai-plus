@@ -8,6 +8,7 @@ import { TenderCard } from "@/components/tenders/TenderCard";
 import { UploadTenderModal } from "@/components/tenders/UploadTenderModal";
 import { CardSkeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
+import { useAuthStore } from "@/lib/stores/authStore";
 import type { Tender, TenderStatus } from "@/lib/types";
 
 const STATUS_FILTERS: Array<{ label: string; value: TenderStatus | "ALL" }> = [
@@ -21,9 +22,12 @@ const STATUS_FILTERS: Array<{ label: string; value: TenderStatus | "ALL" }> = [
 
 export default function TendersPage() {
   const queryClient = useQueryClient();
+  const { user } = useAuthStore();
   const [showUpload, setShowUpload] = useState(false);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<TenderStatus | "ALL">("ALL");
+
+  const canUpload = user?.role === "SENIOR_OFFICER" || user?.role === "SYSTEM_ADMIN";
 
   const { data: tenders = [], isLoading } = useQuery({
     queryKey: ["tenders"],
@@ -51,12 +55,16 @@ export default function TendersPage() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-base font-bold text-slate-800">Tender Management</h2>
-          <p className="text-xs text-slate-500 mt-0.5">Upload documents · AI extracts criteria · Evaluate bidders</p>
+          <p className="text-xs text-slate-500 mt-0.5">
+            {canUpload ? "Upload documents · AI extracts criteria · Evaluate bidders" : "Browse tenders · View criteria · Track evaluations"}
+          </p>
         </div>
-        <button onClick={() => setShowUpload(true)}
-          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors">
-          <Plus className="w-4 h-4" /> Upload Tender
-        </button>
+        {canUpload && (
+          <button onClick={() => setShowUpload(true)}
+            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors">
+            <Plus className="w-4 h-4" /> Upload Tender
+          </button>
+        )}
       </div>
 
       {/* Filters */}
@@ -89,13 +97,19 @@ export default function TendersPage() {
         <EmptyState
           icon={FileText}
           title={search || statusFilter !== "ALL" ? "No tenders match your filter" : "No tenders yet"}
-          description={search || statusFilter !== "ALL" ? "Try a different search or filter" : "Upload your first tender document to begin AI-powered eligibility analysis"}
-          action={
+          description={
+            search || statusFilter !== "ALL"
+              ? "Try a different search or filter"
+              : canUpload
+                ? "Upload your first tender document to begin AI-powered eligibility analysis"
+                : "No tenders have been published yet"
+          }
+          action={canUpload ? (
             <button onClick={() => setShowUpload(true)}
               className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors">
               <Plus className="w-4 h-4" /> Upload Tender
             </button>
-          }
+          ) : undefined}
         />
       ) : (
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">

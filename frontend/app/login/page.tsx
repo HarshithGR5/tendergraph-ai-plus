@@ -4,22 +4,24 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import {
-  Cpu, Eye, EyeOff, Shield, FileCheck, Users, Lock,
-  FileText, ClipboardCheck, Activity, ArrowLeft
+  Cpu, Eye, EyeOff, Shield, FileCheck, Lock,
+  FileText, ClipboardCheck, Activity, ArrowLeft, Building2
 } from "lucide-react";
 import { authApi } from "@/lib/api/auth";
 import { useAuthStore } from "@/lib/stores/authStore";
 import { toast } from "sonner";
 
 const ROLE_CARDS = [
-  { icon: FileText,      label: "Procurement Officer", color: "blue",   desc: "Upload tenders, manage bidders, run evaluations" },
-  { icon: ClipboardCheck,label: "Senior Officer",       color: "purple", desc: "Approve criteria, override verdicts, sign reports" },
-  { icon: Activity,      label: "System Admin",         color: "rose",   desc: "Full access, user management, system config" },
+  { icon: Building2,     label: "Bidder",               color: "teal",   desc: "Self-register for tenders, upload documents, track outcomes" },
+  { icon: FileText,      label: "Procurement Officer",  color: "blue",   desc: "View tenders, trigger evaluations, manage review tasks" },
+  { icon: ClipboardCheck,label: "Senior Officer",       color: "purple", desc: "Upload tenders, approve criteria, override verdicts" },
+  { icon: Activity,      label: "System Admin",         color: "rose",   desc: "Full access, user management, system configuration" },
   { icon: Eye,           label: "Audit Reviewer",       color: "amber",  desc: "Read-only access to audit trail and reports" },
 ];
 
 const COLOR_DOT: Record<string, string> = {
-  blue: "bg-blue-500", purple: "bg-purple-500", rose: "bg-rose-500", amber: "bg-amber-500",
+  blue: "bg-blue-500", purple: "bg-purple-500", rose: "bg-rose-500",
+  amber: "bg-amber-500", teal: "bg-teal-500",
 };
 
 export default function LoginPage() {
@@ -77,7 +79,7 @@ export default function LoginPage() {
             {[
               { icon: FileCheck, label: "Criterion-Level Explainability",  desc: "Every verdict traces to a specific document page and clause" },
               { icon: Shield,    label: "Tamper-Evident Audit Trail",       desc: "SHA-256 hash-chained event log, verifiable by any auditor" },
-              { icon: Users,     label: "Zero Silent Disqualifications",    desc: "Uncertain extractions always escalated to human review" },
+              { icon: Building2, label: "Bidder Self-Registration",         desc: "Bidders register independently and upload documents directly" },
               { icon: Lock,      label: "Deterministic Rule Engine",        desc: "AI extracts — rules decide — never probabilistic verdicts" },
             ].map(({ icon: Icon, label, desc }) => (
               <div key={label} className="flex gap-3">
@@ -94,8 +96,8 @@ export default function LoginPage() {
 
           {/* Role legend */}
           <div className="bg-[#1e293b]/60 border border-[#334155] rounded-xl p-4">
-            <p className="text-[10px] text-slate-500 uppercase tracking-widest font-semibold mb-3">Access Roles</p>
-            <div className="grid grid-cols-2 gap-2">
+            <p className="text-[10px] text-slate-500 uppercase tracking-widest font-semibold mb-3">Platform Roles</p>
+            <div className="space-y-2">
               {ROLE_CARDS.map(({ icon: Icon, label, color, desc }) => (
                 <div key={label} className="flex items-start gap-2">
                   <div className={`w-1.5 h-1.5 rounded-full mt-1.5 flex-shrink-0 ${COLOR_DOT[color]}`} />
@@ -111,7 +113,7 @@ export default function LoginPage() {
 
         <div className="text-slate-600 text-xs flex items-center gap-2">
           <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
-          CRPF Government Procurement · Theme 3 · Hackathon Submission
+          TenderGraph AI+ · Enterprise Procurement Intelligence Platform
         </div>
       </div>
 
@@ -155,7 +157,7 @@ export default function LoginPage() {
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 className="w-full bg-[#1e293b] border border-[#334155] text-white placeholder-slate-600 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/40 transition-all"
-                placeholder="e.g. officer_demo"
+                placeholder="your_username"
                 required
                 autoFocus
               />
@@ -194,33 +196,6 @@ export default function LoginPage() {
             <Link href="/register" className="text-blue-400 hover:text-blue-300 text-xs font-medium transition-colors">
               Register here
             </Link>
-          </div>
-
-          {/* Demo credentials */}
-          <div className="mt-6 p-4 rounded-xl border border-[#1e293b] bg-[#0d1829]">
-            <p className="text-[11px] text-slate-500 mb-2.5 font-semibold uppercase tracking-wide">Demo Credentials</p>
-            <div className="space-y-1.5">
-              {[
-                { label: "Username", value: "officer_demo" },
-                { label: "Password", value: "SecurePass@123" },
-              ].map(({ label, value }) => (
-                <div key={label} className="flex justify-between items-center">
-                  <span className="text-slate-500 text-[11px]">{label}</span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (label === "Username") setUsername(value);
-                      else setPassword(value);
-                    }}
-                    className="text-slate-300 font-mono text-[11px] hover:text-white transition-colors cursor-pointer"
-                    title={`Click to fill ${label.toLowerCase()}`}
-                  >
-                    {value}
-                  </button>
-                </div>
-              ))}
-            </div>
-            <p className="text-[10px] text-slate-600 mt-2">Click value to auto-fill field</p>
           </div>
         </motion.div>
       </div>

@@ -9,9 +9,9 @@ import { tendersApi } from "@/lib/api/tenders";
 import { toast } from "sonner";
 import type { TenderCriterion } from "@/lib/types";
 
-interface Props { criterion: TenderCriterion; onUpdate: (c: TenderCriterion) => void; index: number; }
+interface Props { criterion: TenderCriterion; onUpdate: (c: TenderCriterion) => void; index: number; canApprove: boolean; }
 
-export function CriterionCard({ criterion, onUpdate, index }: Props) {
+export function CriterionCard({ criterion, onUpdate, index, canApprove }: Props) {
   const [expanded, setExpanded] = useState(false);
   const [approving, setApproving] = useState(false);
 
@@ -94,7 +94,7 @@ export function CriterionCard({ criterion, onUpdate, index }: Props) {
           )}
         </div>
 
-        {!criterion.is_approved && (
+        {canApprove && !criterion.is_approved && (
           <button onClick={approve} disabled={approving}
             className="flex-shrink-0 text-xs px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg font-medium transition-colors disabled:opacity-60">
             {approving ? "…" : "Approve"}

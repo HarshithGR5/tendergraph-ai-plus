@@ -50,7 +50,7 @@ const slides: React.FC[] = [
         <div className="w-6 h-6 rounded bg-blue-500 flex items-center justify-center text-xs font-bold text-white">T</div>
         <span className="text-white text-sm font-medium">TenderGraph AI+</span>
       </div>
-      <Tag color="cyan">CRPF Hackathon · Theme 3 · Government Procurement AI</Tag>
+      <Tag color="cyan">Enterprise Procurement Intelligence Platform</Tag>
       <div className="mt-8 mb-4">
         <h1 className="text-7xl font-black text-white leading-none tracking-tight">
           Tender<span className="text-blue-400">Graph</span>
@@ -419,12 +419,13 @@ const slides: React.FC[] = [
           ))}
         </Card>
         <Card>
-          <div className="text-slate-400 text-xs font-semibold uppercase tracking-wider mb-3">Who can review</div>
+          <div className="text-slate-400 text-xs font-semibold uppercase tracking-wider mb-3">Role access model</div>
           {[
-            { role: "PROCUREMENT_OFFICER", can: "View and take tasks" },
-            { role: "SENIOR_OFFICER", can: "Override and sign off" },
+            { role: "BIDDER", can: "Self-register, upload own docs" },
+            { role: "PROCUREMENT_OFFICER", can: "View tenders, trigger evaluation" },
+            { role: "SENIOR_OFFICER", can: "Upload tenders, approve, override" },
             { role: "SYSTEM_ADMIN", can: "Full access + configure thresholds" },
-            { role: "AUDIT_REVIEWER", can: "Read-only view" },
+            { role: "AUDIT_REVIEWER", can: "Read-only audit trail" },
           ].map((r) => (
             <div key={r.role} className="flex justify-between py-1.5 border-b border-white/5 last:border-0 text-xs">
               <code className="text-cyan-300">{r.role}</code>
@@ -522,11 +523,12 @@ const slides: React.FC[] = [
           </div>
         ))}
       </div>
-      <div className="mt-6 grid grid-cols-4 gap-4">
+      <div className="mt-6 grid grid-cols-5 gap-3">
         {[
+          { role: "BIDDER", views: "Tender list + own docs" },
           { role: "PROCUREMENT_OFFICER", views: "1 · 2 · 3 · 4" },
-          { role: "SENIOR_OFFICER", views: "1 · 2 · 3 · 4" },
-          { role: "SYSTEM_ADMIN", views: "1 · 2 · 3 · 4 · 5 + Settings" },
+          { role: "SENIOR_OFFICER", views: "1 · 2 · 3 · 4 (upload + approve)" },
+          { role: "SYSTEM_ADMIN", views: "1–5 + Settings" },
           { role: "AUDIT_REVIEWER", views: "5 only (read-only)" },
         ].map((r) => (
           <div key={r.role} className="bg-white/3 border border-white/5 rounded-xl p-3 text-center">
@@ -591,7 +593,7 @@ const slides: React.FC[] = [
   () => (
     <div className="flex flex-col justify-center h-full px-20">
       <div className="mb-3"><Tag color="emerald">Government Deployability</Tag></div>
-      <h2 className="text-4xl font-black text-white mb-8">Ready for NIC. Ready for CRPF. Ready for CVC.</h2>
+      <h2 className="text-4xl font-black text-white mb-8">On-premise. Air-gapped. Regulator-ready.</h2>
       <div className="grid grid-cols-2 gap-5">
         <div className="space-y-3">
           {[
@@ -787,7 +789,7 @@ const slides: React.FC[] = [
   () => (
     <div className="flex flex-col justify-center h-full px-20">
       <div className="mb-3"><Tag color="blue">Scalability</Tag></div>
-      <h2 className="text-4xl font-black text-white mb-8">From one CRPF unit to national deployment.</h2>
+      <h2 className="text-4xl font-black text-white mb-8">From one procurement unit to national deployment.</h2>
       <div className="grid grid-cols-2 gap-6">
         <div className="space-y-4">
           <Card>
@@ -835,7 +837,7 @@ const slides: React.FC[] = [
   () => (
     <div className="flex flex-col justify-center h-full px-20">
       <div className="mb-3"><Tag color="cyan">Future Roadmap</Tag></div>
-      <h2 className="text-4xl font-black text-white mb-8">From CRPF to a national procurement platform.</h2>
+      <h2 className="text-4xl font-black text-white mb-8">From department to national procurement platform.</h2>
       <div className="grid grid-cols-3 gap-5">
         {[
           {
@@ -946,7 +948,7 @@ export default function PresentationPage() {
         <div className="flex items-center gap-3">
           <div className="w-6 h-6 rounded bg-blue-600 flex items-center justify-center text-xs font-black">T</div>
           <span className="text-sm font-semibold text-slate-300">TenderGraph AI+</span>
-          <span className="text-slate-600 text-xs">· CRPF Hackathon Presentation</span>
+          <span className="text-slate-600 text-xs">· Platform Overview</span>
         </div>
         <PBar n={cur} total={TOTAL} />
         <div className="text-slate-500 text-xs font-mono">{cur + 1} / {TOTAL}</div>

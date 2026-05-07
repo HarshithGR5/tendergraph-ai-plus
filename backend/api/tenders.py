@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, B
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from backend.api.auth import get_current_user, require_role
+from backend.api.auth import get_current_user, require_role, hash_password, verify_password
 from backend.config import settings
 from backend.database import get_db
 from backend.models.tables import (
@@ -20,6 +20,13 @@ from backend.services import audit_service
 from backend.services.tender_parser import process_tender
 
 router = APIRouter(prefix="/tenders", tags=["tenders"])
+
+# Roles that can upload / manage tenders
+TENDER_MANAGERS = (UserRole.SENIOR_OFFICER, UserRole.SYSTEM_ADMIN)
+# Roles that can approve criteria / override verdicts
+APPROVERS = (UserRole.SENIOR_OFFICER, UserRole.SYSTEM_ADMIN)
+# All internal staff (not bidders)
+INTERNAL_STAFF = (UserRole.PROCUREMENT_OFFICER, UserRole.SENIOR_OFFICER, UserRole.SYSTEM_ADMIN, UserRole.AUDIT_REVIEWER)
 
 
 class ThresholdJson(BaseModel):
@@ -83,9 +90,14 @@ class TenderOut(BaseModel):
     created_at: datetime
     updated_at: datetime
     criteria_count: Optional[int] = 0
+    has_view_password: bool = False
 
     class Config:
         from_attributes = True
+
+
+class VerifyViewPasswordPayload(BaseModel):
+    password: str
 
 
 def _save_upload(file: UploadFile, subfolder: str) -> str:
@@ -108,6 +120,14 @@ def _process_tender_bg(tender_id: str):
         db.close()
 
 
+def _build_tender_out(t: Tender) -> TenderOut:
+    out = TenderOut.model_validate(t)
+    out.criteria_count = len(t.criteria)
+    out.has_view_password = bool(t.view_password_hash)
+    return out
+
+
+# ── Tender upload: Senior Officer + Admin only ─────────────────────────────────
 @router.post("/", response_model=TenderOut, status_code=201)
 def upload_tender(
     background_tasks: BackgroundTasks,
@@ -116,9 +136,10 @@ def upload_tender(
     nit_number: str = Form(None),
     closing_date: str = Form(None),
     emd_amount: float = Form(None),
+    view_password: str = Form(None),
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_role(UserRole.SENIOR_OFFICER, UserRole.SYSTEM_ADMIN)),
 ):
     allowed_ext = {".pdf", ".docx", ".doc", ".png", ".jpg", ".jpeg", ".tiff"}
     ext = Path(file.filename).suffix.lower()
@@ -145,6 +166,7 @@ def upload_tender(
         file_type=ext.lstrip("."),
         status=TenderStatus.UPLOADING,
         ocr_status=OCRStatus.PENDING,
+        view_password_hash=hash_password(view_password) if view_password else None,
     )
     db.add(tender)
     db.commit()
@@ -160,21 +182,14 @@ def upload_tender(
     )
 
     background_tasks.add_task(_process_tender_bg, tender.tender_id)
-
-    result = TenderOut.model_validate(tender)
-    result.criteria_count = 0
-    return result
+    return _build_tender_out(tender)
 
 
+# ── List tenders: all internal staff + bidders (public list) ──────────────────
 @router.get("/", response_model=List[TenderOut])
 def list_tenders(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     tenders = db.query(Tender).order_by(Tender.created_at.desc()).all()
-    results = []
-    for t in tenders:
-        out = TenderOut.model_validate(t)
-        out.criteria_count = len(t.criteria)
-        results.append(out)
-    return results
+    return [_build_tender_out(t) for t in tenders]
 
 
 @router.get("/{tender_id}", response_model=TenderOut)
@@ -182,11 +197,38 @@ def get_tender(tender_id: str, db: Session = Depends(get_db), current_user: User
     tender = db.query(Tender).filter(Tender.tender_id == tender_id).first()
     if not tender:
         raise HTTPException(status_code=404, detail="Tender not found.")
-    out = TenderOut.model_validate(tender)
-    out.criteria_count = len(tender.criteria)
-    return out
+    return _build_tender_out(tender)
 
 
+# ── Verify view password for bidder applications ───────────────────────────────
+@router.post("/{tender_id}/verify-view-password", response_model=dict)
+def verify_view_password(
+    tender_id: str,
+    payload: VerifyViewPasswordPayload,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role(
+        UserRole.PROCUREMENT_OFFICER, UserRole.SENIOR_OFFICER, UserRole.SYSTEM_ADMIN
+    )),
+):
+    tender = db.query(Tender).filter(Tender.tender_id == tender_id).first()
+    if not tender:
+        raise HTTPException(status_code=404, detail="Tender not found.")
+    if not tender.view_password_hash:
+        return {"verified": True}
+    if not verify_password(payload.password, tender.view_password_hash):
+        raise HTTPException(status_code=403, detail="Incorrect viewing password.")
+    audit_service.log_event(
+        db=db,
+        event_type=AuditEventType.BIDDER_DOC_VIEWED,
+        actor_id=current_user.user_id,
+        actor_type="HUMAN",
+        payload={"tender_id": tender_id, "action": "view_password_verified"},
+        tender_id=tender_id,
+    )
+    return {"verified": True}
+
+
+# ── Criteria: read by all staff; write by approvers only ──────────────────────
 @router.get("/{tender_id}/criteria", response_model=List[CriterionOut])
 def get_criteria(tender_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     tender = db.query(Tender).filter(Tender.tender_id == tender_id).first()
@@ -200,7 +242,7 @@ def add_criterion(
     tender_id: str,
     payload: CriterionCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_role(UserRole.SENIOR_OFFICER, UserRole.SYSTEM_ADMIN)),
 ):
     tender = db.query(Tender).filter(Tender.tender_id == tender_id).first()
     if not tender:
@@ -230,7 +272,7 @@ def update_criterion(
     criterion_id: str,
     payload: CriterionUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_role(UserRole.SENIOR_OFFICER, UserRole.SYSTEM_ADMIN)),
 ):
     criterion = db.query(TenderCriterion).filter(
         TenderCriterion.criterion_id == criterion_id,
@@ -249,7 +291,7 @@ def update_criterion(
 def approve_all_criteria(
     tender_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_role(UserRole.SENIOR_OFFICER, UserRole.SYSTEM_ADMIN)),
 ):
     tender = db.query(Tender).filter(Tender.tender_id == tender_id).first()
     if not tender:
@@ -276,7 +318,7 @@ def approve_criterion(
     tender_id: str,
     criterion_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_role(UserRole.SENIOR_OFFICER, UserRole.SYSTEM_ADMIN)),
 ):
     criterion = db.query(TenderCriterion).filter(
         TenderCriterion.criterion_id == criterion_id,
@@ -295,7 +337,7 @@ def delete_criterion(
     tender_id: str,
     criterion_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_role(UserRole.SENIOR_OFFICER, UserRole.SYSTEM_ADMIN)),
 ):
     criterion = db.query(TenderCriterion).filter(
         TenderCriterion.criterion_id == criterion_id,

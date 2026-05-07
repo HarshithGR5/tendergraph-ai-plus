@@ -1,51 +1,47 @@
 # TenderGraph AI+
 
-> **AI-Powered Tender Evaluation & Bidder Eligibility Platform for Government Procurement**  
-> Theme 3 · CRPF Hackathon Submission
+**Enterprise Procurement Intelligence Platform**
 
-TenderGraph AI+ transforms the manual, error-prone process of government tender evaluation into a structured, explainable, and cryptographically auditable AI-assisted workflow. It ingests tender documents of any format, extracts structured eligibility criteria, evaluates bidder submissions with OCR + GPT-4o, and produces **criterion-level eligibility verdicts** that every procurement officer can trust, verify, and sign off on.
-
----
-
-## The Problem
-
-A procurement officer at CRPF or any central government body receives a tender document spanning 80–200 pages with eligibility conditions scattered across multiple sections. For a competitive tender with 10 bidders and 12 eligibility criteria, that is **120 individual checks** — each requiring a human to locate a document, find the relevant value, and compare it against the tender clause. The resulting problems:
-
-- **Inconsistency** — Two evaluators may reach different conclusions from the same documents
-- **Oversight** — Officers miss criteria buried in sub-clauses
-- **Non-auditability** — Manual checklists are often reconstructed after the fact
-- **Legal exposure** — Any of the above can result in successful legal challenges to the award
+AI-powered tender evaluation and bidder eligibility platform for government procurement. Extracts eligibility criteria from tender documents, evaluates bidder submissions using GPT-4o OCR + a deterministic rule engine, and produces criterion-level explainable verdicts with an immutable audit trail.
 
 ---
 
-## Three Non-Negotiable Principles
-
-| Principle | Mechanism |
-|-----------|-----------|
-| **No silent disqualification** | Any extraction with confidence < 0.60 is escalated to `NEEDS_MANUAL_REVIEW` |
-| **Criterion-level explainability** | Every verdict cites tender clause · document · page · extracted value |
-| **Immutable auditability** | SHA-256 hash-chained `audit_events` table — verifiable by CVC / High Courts |
-
----
-
-## Architecture
+## Architecture Principle
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│  Tender Upload → OCR Pipeline → Criterion Extraction (LLM)  │
-│                                      ↓                       │
-│  Bidder Upload → OCR Pipeline → Evidence Extraction (LLM)   │
-│                                      ↓                       │
-│              Deterministic Rule Engine (Python)              │
-│         AI EXTRACTS · RULES DECIDE · NEVER LLM VERDICT      │
-│                                      ↓                       │
-│  Confidence Gate → ELIGIBLE / NOT_ELIGIBLE / NEEDS_REVIEW   │
-│                                      ↓                       │
-│  Human Review → Override Logged → PDF Report → Audit Trail  │
-└─────────────────────────────────────────────────────────────┘
+AI Extracts → Rule Engine Decides → Human Reviews → Audit Records
 ```
 
-**Key architectural decision:** The AI extraction layer and rule-based decision layer are strictly separated. AI is never given the authority to emit a final eligibility verdict. It extracts structured data from unstructured documents. The rule engine applies deterministic logic to that structured data. This separation is what makes the platform legally defensible.
+GPT-4o reads unstructured documents and extracts structured evidence. A deterministic Python rule engine makes **all** final eligibility decisions — never the AI directly. This separation ensures reproducibility and legal defensibility.
+
+---
+
+## Quick Start
+
+```bash
+# 1. Install Python dependencies
+pip install -r requirements.txt
+
+# 2. Install Node dependencies
+cd frontend && npm install && cd ..
+
+# 3. Set required environment variables
+export DATABASE_URL="postgresql://..."
+export OPENAI_API_KEY="sk-..."
+export SECRET_KEY="your-secret-key"
+
+# 4. Run database migrations
+python -m alembic -c backend/alembic.ini upgrade head
+
+# 5. Start backend API
+uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
+
+# 6. Start frontend (separate terminal)
+cd frontend && npm run dev -- --port 5000
+```
+
+- **API docs**: `http://localhost:8000/api/docs`
+- **Health check**: `GET /api/health`
 
 ---
 
@@ -53,242 +49,69 @@ A procurement officer at CRPF or any central government body receives a tender d
 
 | Layer | Technology |
 |-------|-----------|
-| **API** | FastAPI 0.115 + Uvicorn |
-| **Database** | PostgreSQL (SQLAlchemy 2.0 + Alembic migrations) |
-| **AI / LLM** | GPT-4o (OpenAI) — structured JSON output mode |
-| **PDF / OCR** | PyMuPDF · pdfplumber · pytesseract · GPT-4o Vision |
-| **Auth** | JWT (python-jose) + bcrypt password hashing |
-| **Task Queue** | FastAPI BackgroundTasks (Celery + Redis optional) |
-| **Reports** | ReportLab PDF generation |
-| **Frontend** | Next.js 15 + React 19 + TypeScript + Tailwind CSS |
-| **State** | Zustand + React Query |
-| **Charts** | Recharts |
+| Runtime | Python 3.11 + Node.js 20 |
+| API | FastAPI 0.115 + Uvicorn |
+| ORM | SQLAlchemy 2.0 + Alembic |
+| Database | PostgreSQL |
+| Auth | JWT (python-jose) + bcrypt 4.0.1 (pinned) |
+| LLM/OCR | GPT-4o (OpenAI) via structured JSON output |
+| PDF parsing | PyMuPDF + pdfplumber (native), GPT-4o Vision (scanned) |
+| Reports | ReportLab PDF generation |
+| Frontend | Next.js 15 + React 19 + TypeScript + Tailwind CSS v4 |
+| State | Zustand + React Query |
+| Charts | Recharts |
 
 ---
 
-## Project Structure
+## User Roles & Permissions
 
-```
-tendergraph-ai-plus/
-├── backend/
-│   ├── main.py                  # FastAPI app entry point
-│   ├── config.py                # Pydantic settings (env-based)
-│   ├── database.py              # SQLAlchemy engine + session
-│   ├── alembic.ini              # Alembic migration config
-│   ├── api/
-│   │   ├── auth.py              # Registration, login, JWT
-│   │   ├── tenders.py           # Tender upload + criteria management
-│   │   ├── bidders.py           # Bidder registration + document upload
-│   │   ├── verdicts.py          # Criterion verdict queries
-│   │   ├── reviews.py           # Manual review task workflow
-│   │   ├── reports.py           # PDF report generation + download
-│   │   └── audit.py             # Audit trail + hash chain verification
-│   ├── models/
-│   │   └── tables.py            # All 10 SQLAlchemy ORM models
-│   ├── services/
-│   │   ├── tender_parser.py     # Tender OCR + criteria extraction pipeline
-│   │   ├── ocr_engine.py        # Multi-format OCR (PDF/DOCX/image/scanned)
-│   │   ├── extraction_service.py# Evidence extraction per criterion
-│   │   ├── rule_engine.py       # Deterministic eligibility rule engine
-│   │   └── audit_service.py     # Hash-chained audit event writer
-│   ├── rules/
-│   │   ├── financial.py         # Turnover, EMD, net-worth rules
-│   │   ├── technical.py         # Similar-works, personnel, machinery rules
-│   │   └── compliance.py        # GST/PAN, certifications, blacklist rules
-│   ├── workers/
-│   │   ├── celery_app.py        # Celery app (Redis broker)
-│   │   ├── ocr_worker.py        # Async OCR task
-│   │   ├── extract_worker.py    # Async evidence extraction task
-│   │   └── rule_worker.py       # Async rule engine task
-│   ├── prompts/
-│   │   ├── criterion_extract.j2 # LLM prompt: tender criteria extraction
-│   │   └── evidence_extract.j2  # LLM prompt: bidder evidence extraction
-│   ├── alembic/                 # Migration versions
-│   └── storage/                 # Uploaded files (tenders/ bidders/ reports/)
-├── frontend/
-│   ├── app/
-│   │   ├── page.tsx             # Public landing page
-│   │   ├── login/page.tsx       # Sign in
-│   │   ├── register/page.tsx    # Account creation with role selection
-│   │   └── (dashboard)/
-│   │       ├── dashboard/       # Overview + metrics
-│   │       ├── tenders/         # Tender list + upload
-│   │       ├── tenders/[id]/    # Tender detail + criteria approval
-│   │       │   ├── matrix/      # Bidder comparison matrix
-│   │       │   ├── reviews/     # Manual review queue
-│   │       │   ├── audit/       # Audit trail viewer
-│   │       │   └── reports/     # Evaluation reports
-│   │       └── settings/        # System settings
-│   ├── components/
-│   │   ├── layout/              # Sidebar (role-aware) + Header
-│   │   ├── dashboard/           # Metric cards + charts
-│   │   ├── tenders/             # Tender cards + upload modal + criterion cards
-│   │   ├── matrix/              # Bidder matrix + evidence drawer
-│   │   ├── reviews/             # Review task cards
-│   │   ├── audit/               # Audit timeline
-│   │   └── ui/                  # Badge · skeleton · empty-state · confidence-meter
-│   └── lib/
-│       ├── api/                 # Typed API wrappers for every endpoint
-│       ├── stores/              # Zustand auth store
-│       ├── types/               # TypeScript interfaces matching backend models
-│       └── utils.ts             # Currency · date · confidence formatters
-├── requirements.txt
-├── start.sh
-└── README.md
-```
+| Role | Key Capabilities |
+|------|----------------|
+| `BIDDER` | Self-register to open tenders, upload own company documents, track submission status and verdict |
+| `PROCUREMENT_OFFICER` | View tenders and bidder lists, trigger AI evaluation, manage review tasks |
+| `SENIOR_OFFICER` | Upload tenders, approve extracted criteria, override AI verdicts (all logged), sign reports |
+| `SYSTEM_ADMIN` | All Senior Officer permissions + user management, system config, full audit access |
+| `AUDIT_REVIEWER` | Read-only access to audit trail and SHA-256 hash-chain verification |
+
+### Security Model
+
+- **Tender upload**: `SENIOR_OFFICER` and `SYSTEM_ADMIN` only
+- **Criteria approve/reject**: `SENIOR_OFFICER` and `SYSTEM_ADMIN` only
+- **Verdict overrides**: `SENIOR_OFFICER` and `SYSTEM_ADMIN` only
+- **Bidder document upload**: `BIDDER` role only, own profile only — officers have zero write access
+- **View password gate**: Tenders can be set with a password; officers must enter it to view bidder applications; every access is logged to the immutable audit trail
 
 ---
 
-## User Roles
+## Product Views (Authenticated)
 
-| Role | Access Level | Key Capabilities |
-|------|-------------|-----------------|
-| **PROCUREMENT_OFFICER** | Standard | Upload tenders, register bidders, run AI evaluation, download reports, complete review tasks |
-| **SENIOR_OFFICER** | Elevated | All Officer permissions + approve criteria schemas, override verdicts with logged reason, sign reports |
-| **SYSTEM_ADMIN** | Full | All Senior Officer permissions + create/manage users, configure confidence thresholds, export full audit data |
-| **AUDIT_REVIEWER** | Read-only | View all tenders and verdicts, verify SHA-256 hash chain integrity, export audit trail JSON for CVC |
-
----
-
-## Five Dashboard Views
-
-| View | Purpose |
-|------|---------|
-| **Tender Overview** | Upload tender · AI extracts criteria · Officer approves schema |
-| **Bidder Comparison Matrix** | Colour-coded verdict grid: all bidders × all criteria |
-| **Individual Bidder Report** | Per-bidder criterion-by-criterion evaluation with evidence chain |
-| **Manual Review Queue** | Task board for all `NEEDS_MANUAL_REVIEW` cases with override logging |
-| **Audit Trail Viewer** | Chronological immutable log with hash-chain verification on demand |
+1. **Tender Overview** — upload tender, review/approve extracted criteria
+2. **Bidder Comparison Matrix** — colour-coded verdict matrix across all bidders × criteria
+3. **Individual Bidder Report** — per-bidder criterion-by-criterion evaluation with evidence chain
+4. **Manual Review Queue** — task board for `NEEDS_MANUAL_REVIEW` cases with override logging
+5. **Audit Trail Viewer** — chronological immutable event log with SHA-256 hash-chain verification
 
 ---
 
-## Quick Start
+## Bidder Self-Registration Flow
 
-### Prerequisites
-
-- Python 3.11
-- Node.js 20
-- PostgreSQL database (connection string in `DATABASE_URL`)
-- OpenAI API key
-
-### 1. Clone & Configure
-
-```bash
-git clone https://github.com/your-org/tendergraph-ai-plus.git
-cd tendergraph-ai-plus
-```
-
-Set environment variables:
-```bash
-export DATABASE_URL="postgresql://user:pass@host/db"
-export OPENAI_API_KEY="sk-..."
-export SECRET_KEY="your-secure-secret-key"
-```
-
-### 2. Backend Setup
-
-```bash
-pip install -r requirements.txt
-python -m alembic -c backend/alembic.ini upgrade head
-uvicorn backend.main:app --host 0.0.0.0 --port 8000
-```
-
-### 3. Frontend Setup
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-### 4. Create Your First User
-
-With the backend running, register via the UI at `http://localhost:3000/register` or via the API:
-
-```bash
-curl -X POST http://localhost:8000/api/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{
-    "username": "admin",
-    "email": "admin@example.com",
-    "password": "SecurePass@123",
-    "full_name": "System Administrator",
-    "role": "SYSTEM_ADMIN"
-  }'
-```
+1. Bidder creates an account with role `BIDDER`
+2. Browses the public list of open tenders from the dashboard
+3. Self-registers to a tender by providing company details (name, GSTIN, PAN, etc.)
+4. Uploads their own submission documents directly to their bidder profile
+5. Officers trigger AI evaluation; bidder can track overall verdict status
+6. Every upload and access event is logged to the tamper-evident audit trail
 
 ---
 
-## API Reference
+## Key Design Decisions
 
-Interactive API documentation is available at `http://localhost:8000/api/docs` (Swagger UI) and `http://localhost:8000/api/redoc` (ReDoc).
-
-### Core Endpoints
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `POST` | `/api/auth/register` | Create user account |
-| `POST` | `/api/auth/login` | Authenticate, receive JWT |
-| `GET`  | `/api/auth/me` | Get current user profile |
-| `POST` | `/api/tenders/` | Upload tender document |
-| `GET`  | `/api/tenders/` | List all tenders |
-| `GET`  | `/api/tenders/{id}` | Tender detail + criteria |
-| `POST` | `/api/tenders/{id}/approve-criteria` | Approve extracted criteria schema |
-| `POST` | `/api/bidders/` | Register bidder |
-| `POST` | `/api/bidders/{id}/documents` | Upload bidder document |
-| `POST` | `/api/bidders/{id}/evaluate` | Trigger rule engine evaluation |
-| `GET`  | `/api/verdicts/matrix/{tender_id}` | Bidder comparison matrix |
-| `GET`  | `/api/reviews/` | List manual review tasks |
-| `POST` | `/api/reviews/{id}/resolve` | Resolve review task with override |
-| `POST` | `/api/reports/{tender_id}` | Generate PDF evaluation report |
-| `GET`  | `/api/audit/events` | Query audit trail |
-| `GET`  | `/api/audit/verify-chain` | Verify SHA-256 hash chain |
-
----
-
-## Database Schema (Key Tables)
-
-```
-users              — User accounts with roles
-tenders            — Tender documents + processing status
-tender_criteria    — Extracted eligibility criteria (AI-generated)
-bidders            — Registered bidders per tender
-bidder_documents   — Uploaded submission documents
-document_chunks    — OCR text chunks for retrieval
-bidder_evidence    — Extracted evidence per criterion per bidder
-criterion_verdicts — Eligibility verdicts (rule engine output)
-review_tasks       — Manual review queue items
-audit_events       — Immutable hash-chained event log
-evaluation_reports — Generated PDF reports metadata
-```
-
----
-
-## Confidence Thresholds
-
-| Threshold | Value | Effect |
-|-----------|-------|--------|
-| OCR confidence | 0.60 | Below → `NEEDS_MANUAL_REVIEW` |
-| Extraction confidence | 0.75 | Below → `NEEDS_MANUAL_REVIEW` |
-| Manual review gate | 0.80 | High-confidence auto-verdict only above this |
-| Similar works (eligible) | 0.72 | Cosine similarity threshold |
-| Similar works (review) | 0.55 | Below 0.55 → `NOT_ELIGIBLE` |
-
----
-
-## Audit Trail
-
-Every state-changing event is written to `audit_events` using an append-only path. Each record includes:
-
-- `event_id` — UUID v4
-- `event_type` — `CRITERION_EXTRACTED`, `VERDICT_EMITTED`, `HUMAN_OVERRIDE_APPLIED`, `REPORT_EXPORTED`, etc.
-- `actor_id` — System service ID or human officer ID
-- `payload_json` — Full JSON payload of the event
-- `prev_hash` — SHA-256 of the previous audit record
-- `hash` — `SHA-256(event_id + event_type + actor_id + payload + prev_hash)`
-- `timestamp` — PostgreSQL server timestamp (not client-provided)
-
-The hash chain means any deletion or modification of any record breaks the chain — verifiable by any third party via `GET /api/audit/verify-chain`.
+- **AI extraction ≠ final verdict**: GPT-4o extracts structured evidence; a deterministic Python rule engine makes all eligibility decisions. Reproducible and legally defensible.
+- **Confidence gating**: Extractions with confidence < 0.60 are escalated to `NEEDS_MANUAL_REVIEW` — no bidder is silently disqualified.
+- **Immutable audit trail**: `audit_events` table is append-only with SHA-256 hash chaining. Tamper-evident, verifiable by any external auditor.
+- **Document ownership**: Bidder documents can only be uploaded by the bidder's own account. Officers have zero write access to bidder document storage — enforced at the API layer.
+- **Local storage first**: All uploaded documents stored to `./backend/storage/`. No cloud object storage dependency.
+- **bcrypt pinned at 4.0.1**: passlib[bcrypt] with bcrypt==4.0.1 is required. Do not upgrade.
 
 ---
 
@@ -297,14 +120,56 @@ The hash chain means any deletion or modification of any record breaks the chain
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `DATABASE_URL` | Yes | PostgreSQL connection string |
-| `OPENAI_API_KEY` | Yes | GPT-4o for OCR and criteria/evidence extraction |
-| `SECRET_KEY` | Yes | JWT signing key |
-| `REDIS_URL` | No | Redis broker for Celery workers (optional) |
-| `STORAGE_BASE_PATH` | No | File storage path (default: `./backend/storage`) |
-| `DEBUG` | No | Enable debug logging (default: `false`) |
+| `OPENAI_API_KEY` | Yes | GPT-4o for OCR and LLM extraction |
+| `SECRET_KEY` | Recommended | JWT signing key (defaults to insecure value) |
 
 ---
 
-## License
+## Project Structure
 
-This project is submitted as part of the CRPF Hackathon (Theme 3 — AI-Based Tender Evaluation). All rights reserved.
+```
+backend/
+├── main.py               # FastAPI app + router registration
+├── config.py             # Pydantic settings (env-based)
+├── database.py           # SQLAlchemy engine + session
+├── models/tables.py      # All ORM models — UserRole includes BIDDER
+├── api/
+│   ├── auth.py           # Register, login, JWT, require_role() guard
+│   ├── tenders.py        # Upload (Senior+ only), criteria approve (Senior+ only), view password
+│   ├── bidders.py        # Bidder self-register, document upload (BIDDER only, own profile)
+│   ├── verdicts.py       # Evaluation matrix, verdict override (Senior+ only)
+│   ├── reviews.py        # Review queue; resolve locked to Senior+ only
+│   ├── global_reviews.py # Cross-tender review queue (internal staff only)
+│   ├── reports.py        # PDF report generation
+│   └── audit.py          # Audit trail + hash-chain verification
+├── services/             # tender_parser, ocr_engine, extraction_service, rule_engine, audit_service
+├── rules/                # Deterministic rule functions: financial, technical, compliance
+├── prompts/              # Jinja2 prompt templates
+├── alembic/              # Alembic env + migration versions
+└── storage/              # Local file storage (tenders/, bidders/, reports/)
+
+frontend/
+├── app/
+│   ├── page.tsx          # Public landing page (5 roles, workflow, features)
+│   ├── login/            # Sign-in page with 5-role legend panel
+│   ├── register/         # Account creation — 5 roles including BIDDER
+│   ├── presentation/     # Platform overview slide deck (20 slides, no hackathon references)
+│   └── (dashboard)/      # All authenticated views (role-gated)
+├── components/
+│   ├── layout/           # Sidebar (role-aware — BIDDER gets own Bidder Portal nav)
+│   └── ...
+└── lib/
+    ├── types/index.ts    # UserRole includes "BIDDER"
+    └── ...
+```
+
+---
+
+## Gotchas
+
+- **bcrypt must be 4.0.1** — passlib is incompatible with bcrypt 5.x; login collapses silently.
+- `DATABASE_URL` from Replit already contains `?ssl` — no extra connect_args needed.
+- OCR for scanned PDFs uses GPT-4o Vision — costs API credits per page.
+- Alembic ini file is at `backend/alembic.ini`, not the project root.
+- Criterion verdicts have a unique constraint on `(bidder_id, criterion_id)` — re-running evaluation updates existing records.
+- Bidder document upload is locked to the BIDDER account that owns the profile; the `uploaded_by` column on `bidder_documents` records which user uploaded each file.

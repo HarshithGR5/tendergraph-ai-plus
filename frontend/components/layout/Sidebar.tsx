@@ -4,9 +4,9 @@ import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/lib/stores/authStore";
 import {
-  LayoutDashboard, FileText, Users, Shield, BarChart3,
-  LogOut, ChevronRight, Cpu, Settings, Eye, ClipboardCheck,
-  Activity
+  LayoutDashboard, FileText, Shield, ClipboardCheck,
+  LogOut, ChevronRight, Cpu, Settings, Eye,
+  Activity, Building2, FolderOpen
 } from "lucide-react";
 import type { UserRole } from "@/lib/types";
 
@@ -17,9 +17,15 @@ interface NavItem {
   roles?: UserRole[];
 }
 
-const PROCUREMENT_NAV: NavItem[] = [
-  { label: "Dashboard",    href: "/dashboard", icon: LayoutDashboard },
-  { label: "Tenders",      href: "/tenders",   icon: FileText },
+const OFFICER_NAV: NavItem[] = [
+  { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+  { label: "Tenders",   href: "/tenders",   icon: FileText },
+];
+
+const BIDDER_NAV: NavItem[] = [
+  { label: "My Dashboard",   href: "/dashboard",       icon: LayoutDashboard },
+  { label: "Open Tenders",   href: "/tenders",         icon: FileText },
+  { label: "My Submissions", href: "/my-submissions",  icon: FolderOpen },
 ];
 
 const REVIEW_NAV: NavItem[] = [
@@ -36,7 +42,7 @@ const SYSTEM_NAV: NavItem[] = [
     label: "Audit Trail",
     href: "/audit",
     icon: Shield,
-    roles: ["SENIOR_OFFICER", "SYSTEM_ADMIN", "AUDIT_REVIEWER"],
+    roles: ["SENIOR_OFFICER", "SYSTEM_ADMIN"],
   },
   {
     label: "Settings",
@@ -47,10 +53,11 @@ const SYSTEM_NAV: NavItem[] = [
 ];
 
 const ROLE_META: Record<UserRole, { label: string; color: string; icon: React.ElementType }> = {
-  PROCUREMENT_OFFICER: { label: "Procurement Officer", color: "bg-blue-500",   icon: FileText      },
-  SENIOR_OFFICER:      { label: "Senior Officer",       color: "bg-purple-500", icon: ClipboardCheck },
-  SYSTEM_ADMIN:        { label: "System Admin",          color: "bg-rose-500",   icon: Activity       },
-  AUDIT_REVIEWER:      { label: "Audit Reviewer",        color: "bg-amber-500",  icon: Eye            },
+  PROCUREMENT_OFFICER: { label: "Procurement Officer", color: "bg-blue-500",   icon: FileText        },
+  SENIOR_OFFICER:      { label: "Senior Officer",       color: "bg-purple-500", icon: ClipboardCheck  },
+  SYSTEM_ADMIN:        { label: "System Admin",          color: "bg-rose-500",   icon: Activity        },
+  AUDIT_REVIEWER:      { label: "Audit Reviewer",        color: "bg-amber-500",  icon: Eye             },
+  BIDDER:              { label: "Bidder",                color: "bg-teal-500",   icon: Building2       },
 };
 
 function NavLink({ href, icon: Icon, label, active }: { href: string; icon: React.ElementType; label: string; active: boolean }) {
@@ -86,6 +93,9 @@ export function Sidebar() {
   const roleMeta = role ? ROLE_META[role] : null;
   const RoleIcon = roleMeta?.icon ?? FileText;
 
+  const isBidder = role === "BIDDER";
+  const isAuditReviewer = role === "AUDIT_REVIEWER";
+
   function handleSignOut() {
     clearAuth();
     router.push("/");
@@ -108,45 +118,55 @@ export function Sidebar() {
 
       {/* Nav */}
       <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
-        {/* Procurement group */}
-        <p className="text-[10px] font-semibold text-slate-600 uppercase tracking-wider px-2 mb-2">
-          Procurement
-        </p>
-        {PROCUREMENT_NAV.map((item) => (
-          <NavLink key={item.href} {...item} active={isActive(item.href)} />
-        ))}
-
-        {/* Review group */}
-        {REVIEW_NAV.filter(canSee).length > 0 && (
+        {isBidder ? (
           <>
-            <p className="text-[10px] font-semibold text-slate-600 uppercase tracking-wider px-2 mb-2 mt-5">
-              Review
+            <p className="text-[10px] font-semibold text-slate-600 uppercase tracking-wider px-2 mb-2">
+              Bidder Portal
             </p>
-            {REVIEW_NAV.filter(canSee).map((item) => (
+            {BIDDER_NAV.map((item) => (
               <NavLink key={item.href} {...item} active={isActive(item.href)} />
             ))}
           </>
-        )}
-
-        {/* System group */}
-        {SYSTEM_NAV.filter(canSee).length > 0 && (
+        ) : isAuditReviewer ? (
           <>
-            <p className="text-[10px] font-semibold text-slate-600 uppercase tracking-wider px-2 mb-2 mt-5">
-              System
-            </p>
-            {SYSTEM_NAV.filter(canSee).map((item) => (
-              <NavLink key={item.href} {...item} active={isActive(item.href)} />
-            ))}
-          </>
-        )}
-
-        {/* Audit Reviewer shortcut */}
-        {role === "AUDIT_REVIEWER" && (
-          <>
-            <p className="text-[10px] font-semibold text-slate-600 uppercase tracking-wider px-2 mb-2 mt-5">
+            <p className="text-[10px] font-semibold text-slate-600 uppercase tracking-wider px-2 mb-2">
               Audit
             </p>
             <NavLink href="/audit" icon={Shield} label="Audit Trail" active={isActive("/audit")} />
+          </>
+        ) : (
+          <>
+            {/* Procurement group */}
+            <p className="text-[10px] font-semibold text-slate-600 uppercase tracking-wider px-2 mb-2">
+              Procurement
+            </p>
+            {OFFICER_NAV.map((item) => (
+              <NavLink key={item.href} {...item} active={isActive(item.href)} />
+            ))}
+
+            {/* Review group */}
+            {REVIEW_NAV.filter(canSee).length > 0 && (
+              <>
+                <p className="text-[10px] font-semibold text-slate-600 uppercase tracking-wider px-2 mb-2 mt-5">
+                  Review
+                </p>
+                {REVIEW_NAV.filter(canSee).map((item) => (
+                  <NavLink key={item.href} {...item} active={isActive(item.href)} />
+                ))}
+              </>
+            )}
+
+            {/* System group */}
+            {SYSTEM_NAV.filter(canSee).length > 0 && (
+              <>
+                <p className="text-[10px] font-semibold text-slate-600 uppercase tracking-wider px-2 mb-2 mt-5">
+                  System
+                </p>
+                {SYSTEM_NAV.filter(canSee).map((item) => (
+                  <NavLink key={item.href} {...item} active={isActive(item.href)} />
+                ))}
+              </>
+            )}
           </>
         )}
       </nav>
@@ -164,7 +184,7 @@ export function Sidebar() {
           </div>
           <div className="flex-1 min-w-0">
             <div className="text-slate-200 text-xs font-medium truncate">
-              {user?.full_name ?? user?.username ?? "Officer"}
+              {user?.full_name ?? user?.username ?? "User"}
             </div>
             <div className="text-slate-500 text-[10px] truncate flex items-center gap-1">
               {roleMeta && <RoleIcon className="w-2.5 h-2.5" />}

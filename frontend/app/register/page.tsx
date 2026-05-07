@@ -5,7 +5,7 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import {
   Cpu, Eye, EyeOff, ArrowLeft,
-  FileText, ClipboardCheck, Activity, Eye as EyeIcon, CheckCircle
+  FileText, ClipboardCheck, Activity, Eye as EyeIcon, CheckCircle, Building2
 } from "lucide-react";
 import { authApi } from "@/lib/api/auth";
 import { toast } from "sonner";
@@ -23,13 +23,22 @@ interface RoleOption {
 
 const ROLES: RoleOption[] = [
   {
+    value: "BIDDER",
+    label: "Bidder",
+    icon: Building2,
+    color: "border-teal-600 bg-teal-950/40",
+    iconBg: "bg-teal-900/60",
+    iconColor: "text-teal-400",
+    permissions: ["Self-register to open tenders", "Upload company documents", "Track submission status", "View own verdict outcome"],
+  },
+  {
     value: "PROCUREMENT_OFFICER",
     label: "Procurement Officer",
     icon: FileText,
     color: "border-blue-600 bg-blue-950/40",
     iconBg: "bg-blue-900/60",
     iconColor: "text-blue-400",
-    permissions: ["Upload & manage tenders", "Register bidders", "Run evaluations", "Download reports"],
+    permissions: ["View tenders & bidder lists", "Trigger AI evaluations", "Work review queue tasks", "Download reports"],
   },
   {
     value: "SENIOR_OFFICER",
@@ -38,7 +47,7 @@ const ROLES: RoleOption[] = [
     color: "border-purple-600 bg-purple-950/40",
     iconBg: "bg-purple-900/60",
     iconColor: "text-purple-400",
-    permissions: ["All Officer permissions", "Approve criteria schemas", "Override verdicts", "Sign reports"],
+    permissions: ["Upload & manage tenders", "Approve criteria schemas", "Override verdicts", "Sign reports"],
   },
   {
     value: "SYSTEM_ADMIN",
@@ -70,7 +79,7 @@ export default function RegisterPage() {
     full_name: "",
     password: "",
     confirmPassword: "",
-    role: "PROCUREMENT_OFFICER" as UserRole,
+    role: "BIDDER" as UserRole,
   });
   const [showPw, setShowPw] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -159,7 +168,7 @@ export default function RegisterPage() {
           </div>
         </div>
 
-        <p className="text-slate-600 text-xs">CRPF Government Procurement · Theme 3</p>
+        <p className="text-slate-600 text-xs">TenderGraph AI+ · Enterprise Procurement Intelligence</p>
       </div>
 
       {/* Right panel */}
@@ -206,7 +215,7 @@ export default function RegisterPage() {
                   value={form.full_name}
                   onChange={(e) => set("full_name", e.target.value)}
                   className="w-full bg-[#1e293b] border border-[#334155] text-white placeholder-slate-600 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/40 transition-all"
-                  placeholder="Rajesh Kumar"
+                  placeholder="Your full name"
                 />
               </div>
               <div className="col-span-2">
@@ -216,7 +225,7 @@ export default function RegisterPage() {
                   value={form.username}
                   onChange={(e) => set("username", e.target.value.toLowerCase().replace(/\s/g, "_"))}
                   className="w-full bg-[#1e293b] border border-[#334155] text-white placeholder-slate-600 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/40 transition-all"
-                  placeholder="officer_rajesh"
+                  placeholder="username"
                   required
                 />
               </div>
@@ -227,7 +236,7 @@ export default function RegisterPage() {
                   value={form.email}
                   onChange={(e) => set("email", e.target.value)}
                   className="w-full bg-[#1e293b] border border-[#334155] text-white placeholder-slate-600 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/40 transition-all"
-                  placeholder="officer@crpf.gov.in"
+                  placeholder="you@company.com"
                   required
                 />
               </div>

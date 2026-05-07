@@ -1,4 +1,4 @@
-export type UserRole = "PROCUREMENT_OFFICER" | "SENIOR_OFFICER" | "SYSTEM_ADMIN" | "AUDIT_REVIEWER";
+export type UserRole = "PROCUREMENT_OFFICER" | "SENIOR_OFFICER" | "SYSTEM_ADMIN" | "AUDIT_REVIEWER" | "BIDDER";
 
 export interface User {
   user_id: string;
@@ -39,6 +39,7 @@ export interface Tender {
   created_at: string;
   updated_at: string;
   criteria_count: number;
+  has_view_password: boolean;
 }
 
 export type CriterionCategory = "FINANCIAL" | "TECHNICAL" | "COMPLIANCE" | "COMPLETENESS";
@@ -166,7 +167,7 @@ export type AuditEventType =
   | "CRITERION_EXTRACTED" | "EVIDENCE_EXTRACTED" | "VERDICT_EMITTED"
   | "HUMAN_REVIEW_ASSIGNED" | "HUMAN_OVERRIDE_APPLIED" | "REPORT_EXPORTED"
   | "USER_LOGIN" | "CRITERION_SCHEMA_APPROVED" | "TENDER_UPLOADED"
-  | "BIDDER_UPLOADED" | "OCR_COMPLETED";
+  | "BIDDER_UPLOADED" | "BIDDER_REGISTERED" | "OCR_COMPLETED" | "BIDDER_DOC_VIEWED";
 
 export interface AuditEvent {
   event_id: string;

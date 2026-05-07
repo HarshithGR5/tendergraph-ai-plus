@@ -8,18 +8,21 @@ from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPExcepti
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from backend.api.auth import get_current_user
+from backend.api.auth import get_current_user, require_role
 from backend.config import settings
 from backend.database import get_db
 from backend.models.tables import (
     AuditEventType, Bidder, BidderDocument, BidderEvidence,
-    DocumentChunk, OCRStatus, OverallVerdict, Tender, User
+    DocumentChunk, OCRStatus, OverallVerdict, Tender, User, UserRole
 )
 from backend.services import audit_service
 from backend.services.ocr_engine import extract_document
 from backend.services.extraction_service import extract_evidence_for_criterion
 
 router = APIRouter(prefix="/tenders/{tender_id}/bidders", tags=["bidders"])
+
+# Internal staff who can VIEW bidder list and trigger evaluation
+EVALUATION_ROLES = (UserRole.PROCUREMENT_OFFICER, UserRole.SENIOR_OFFICER, UserRole.SYSTEM_ADMIN)
 
 
 class BidderCreate(BaseModel):
@@ -174,31 +177,43 @@ def _run_extraction_and_rules_bg(bidder_id: str):
         db.close()
 
 
-@router.post("/", response_model=BidderOut, status_code=201)
-def create_bidder(
+# ── Bidder self-registration: BIDDER role users only ──────────────────────────
+@router.post("/self-register", response_model=BidderOut, status_code=201)
+def self_register_bidder(
     tender_id: str,
     payload: BidderCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_role(UserRole.BIDDER)),
 ):
+    """Bidder self-registers to a tender after reviewing the open tender list."""
     tender = db.query(Tender).filter(Tender.tender_id == tender_id).first()
     if not tender:
         raise HTTPException(status_code=404, detail="Tender not found.")
+
+    # Prevent a bidder from registering to the same tender twice
+    existing = db.query(Bidder).filter(
+        Bidder.tender_id == tender_id,
+        Bidder.user_id == current_user.user_id
+    ).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="You have already registered for this tender.")
+
     bidder = Bidder(
         tender_id=tender_id,
+        user_id=current_user.user_id,
         company_name=payload.company_name,
         gstin=payload.gstin,
         pan=payload.pan,
-        email=payload.email,
-        contact_name=payload.contact_name,
+        email=payload.email or current_user.email,
+        contact_name=payload.contact_name or current_user.full_name,
     )
     db.add(bidder)
     db.commit()
     db.refresh(bidder)
     audit_service.log_event(
-        db=db, event_type=AuditEventType.BIDDER_UPLOADED,
+        db=db, event_type=AuditEventType.BIDDER_REGISTERED,
         actor_id=current_user.user_id, actor_type="HUMAN",
-        payload={"bidder_id": bidder.bidder_id, "company_name": payload.company_name},
+        payload={"bidder_id": bidder.bidder_id, "company_name": payload.company_name, "tender_id": tender_id},
         tender_id=tender_id, bidder_id=bidder.bidder_id,
     )
     out = BidderOut.model_validate(bidder)
@@ -206,8 +221,33 @@ def create_bidder(
     return out
 
 
+# ── Bidder: get own profile ────────────────────────────────────────────────────
+@router.get("/my-registration", response_model=BidderOut)
+def get_my_registration(
+    tender_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role(UserRole.BIDDER)),
+):
+    bidder = db.query(Bidder).filter(
+        Bidder.tender_id == tender_id,
+        Bidder.user_id == current_user.user_id
+    ).first()
+    if not bidder:
+        raise HTTPException(status_code=404, detail="You are not registered for this tender.")
+    out = BidderOut.model_validate(bidder)
+    out.document_count = len(bidder.documents)
+    return out
+
+
+# ── List bidders: internal staff only ─────────────────────────────────────────
 @router.get("/", response_model=List[BidderOut])
-def list_bidders(tender_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def list_bidders(
+    tender_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role(
+        UserRole.PROCUREMENT_OFFICER, UserRole.SENIOR_OFFICER, UserRole.SYSTEM_ADMIN, UserRole.AUDIT_REVIEWER
+    )),
+):
     tender = db.query(Tender).filter(Tender.tender_id == tender_id).first()
     if not tender:
         raise HTTPException(status_code=404, detail="Tender not found.")
@@ -220,15 +260,24 @@ def list_bidders(tender_id: str, db: Session = Depends(get_db), current_user: Us
 
 
 @router.get("/{bidder_id}", response_model=BidderOut)
-def get_bidder(tender_id: str, bidder_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def get_bidder(
+    tender_id: str,
+    bidder_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     bidder = db.query(Bidder).filter(Bidder.bidder_id == bidder_id, Bidder.tender_id == tender_id).first()
     if not bidder:
         raise HTTPException(status_code=404, detail="Bidder not found.")
+    # Bidders can only see their own record
+    if current_user.role == UserRole.BIDDER and bidder.user_id != current_user.user_id:
+        raise HTTPException(status_code=403, detail="Access denied.")
     out = BidderOut.model_validate(bidder)
     out.document_count = len(bidder.documents)
     return out
 
 
+# ── Document upload: BIDDER role only, own record only ────────────────────────
 @router.post("/{bidder_id}/documents", response_model=DocumentOut, status_code=201)
 def upload_document(
     tender_id: str,
@@ -237,14 +286,17 @@ def upload_document(
     doc_category: str = Form(None),
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_role(UserRole.BIDDER)),
 ):
+    """Only the BIDDER who owns this profile can upload documents. Officers cannot."""
     bidder = db.query(Bidder).filter(Bidder.bidder_id == bidder_id, Bidder.tender_id == tender_id).first()
     if not bidder:
         raise HTTPException(status_code=404, detail="Bidder not found.")
 
-    import os
-    file_size = 0
+    # Strict ownership check — must be the bidder's own account
+    if bidder.user_id != current_user.user_id:
+        raise HTTPException(status_code=403, detail="You can only upload documents to your own bidder profile.")
+
     file.file.seek(0, 2)
     file_size = file.file.tell()
     file.file.seek(0)
@@ -261,30 +313,54 @@ def upload_document(
         storage_path=storage_path,
         file_size_bytes=file_size,
         ocr_status=OCRStatus.PENDING,
+        uploaded_by=current_user.user_id,
     )
     db.add(doc)
     db.commit()
     db.refresh(doc)
 
+    audit_service.log_event(
+        db=db,
+        event_type=AuditEventType.BIDDER_UPLOADED,
+        actor_id=current_user.user_id,
+        actor_type="HUMAN",
+        payload={"doc_id": doc.doc_id, "bidder_id": bidder_id, "filename": file.filename},
+        tender_id=tender_id,
+        bidder_id=bidder_id,
+    )
+
     background_tasks.add_task(_process_document_bg, doc.doc_id)
     return doc
 
 
+# ── Documents list: internal staff (after password check) OR own bidder ───────
 @router.get("/{bidder_id}/documents", response_model=List[DocumentOut])
-def list_documents(tender_id: str, bidder_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def list_documents(
+    tender_id: str,
+    bidder_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     bidder = db.query(Bidder).filter(Bidder.bidder_id == bidder_id, Bidder.tender_id == tender_id).first()
     if not bidder:
         raise HTTPException(status_code=404, detail="Bidder not found.")
+    if current_user.role == UserRole.BIDDER and bidder.user_id != current_user.user_id:
+        raise HTTPException(status_code=403, detail="Access denied.")
+    if current_user.role == UserRole.AUDIT_REVIEWER:
+        raise HTTPException(status_code=403, detail="Audit Reviewers cannot view raw bidder documents.")
     return bidder.documents
 
 
+# ── Evaluation trigger: Procurement Officer + above ───────────────────────────
 @router.post("/{bidder_id}/evaluate", response_model=dict)
 def trigger_evaluation(
     tender_id: str,
     bidder_id: str,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_role(
+        UserRole.PROCUREMENT_OFFICER, UserRole.SENIOR_OFFICER, UserRole.SYSTEM_ADMIN
+    )),
 ):
     bidder = db.query(Bidder).filter(Bidder.bidder_id == bidder_id, Bidder.tender_id == tender_id).first()
     if not bidder:
@@ -294,7 +370,14 @@ def trigger_evaluation(
 
 
 @router.get("/{bidder_id}/evidence", response_model=List[EvidenceOut])
-def get_evidence(tender_id: str, bidder_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def get_evidence(
+    tender_id: str,
+    bidder_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role(
+        UserRole.PROCUREMENT_OFFICER, UserRole.SENIOR_OFFICER, UserRole.SYSTEM_ADMIN, UserRole.AUDIT_REVIEWER
+    )),
+):
     bidder = db.query(Bidder).filter(Bidder.bidder_id == bidder_id, Bidder.tender_id == tender_id).first()
     if not bidder:
         raise HTTPException(status_code=404, detail="Bidder not found.")

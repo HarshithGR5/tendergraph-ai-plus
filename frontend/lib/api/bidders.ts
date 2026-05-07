@@ -23,6 +23,27 @@ export const biddersApi = {
     return data;
   },
 
+  selfRegister: async (tenderId: string, payload: {
+    company_name: string;
+    gstin?: string;
+    pan?: string;
+    email?: string;
+    contact_name?: string;
+  }): Promise<Bidder> => {
+    const { data } = await apiClient.post<Bidder>(`/api/tenders/${tenderId}/bidders/self-register`, payload);
+    return data;
+  },
+
+  getMyRegistration: async (tenderId: string): Promise<Bidder> => {
+    const { data } = await apiClient.get<Bidder>(`/api/tenders/${tenderId}/bidders/my-registration`);
+    return data;
+  },
+
+  getMySubmissions: async (): Promise<Bidder[]> => {
+    const { data } = await apiClient.get<Bidder[]>("/api/bidder/my-submissions");
+    return data;
+  },
+
   uploadDocument: async (tenderId: string, bidderId: string, formData: FormData): Promise<BidderDocument> => {
     const { data } = await apiClient.post<BidderDocument>(
       `/api/tenders/${tenderId}/bidders/${bidderId}/documents`,

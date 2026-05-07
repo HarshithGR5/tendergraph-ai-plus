@@ -76,7 +76,9 @@ class AuditEventType(str, enum.Enum):
     CRITERION_SCHEMA_APPROVED = "CRITERION_SCHEMA_APPROVED"
     TENDER_UPLOADED = "TENDER_UPLOADED"
     BIDDER_UPLOADED = "BIDDER_UPLOADED"
+    BIDDER_REGISTERED = "BIDDER_REGISTERED"
     OCR_COMPLETED = "OCR_COMPLETED"
+    BIDDER_DOC_VIEWED = "BIDDER_DOC_VIEWED"
 
 
 class UserRole(str, enum.Enum):
@@ -84,6 +86,7 @@ class UserRole(str, enum.Enum):
     SENIOR_OFFICER = "SENIOR_OFFICER"
     SYSTEM_ADMIN = "SYSTEM_ADMIN"
     AUDIT_REVIEWER = "AUDIT_REVIEWER"
+    BIDDER = "BIDDER"
 
 
 class User(Base):
@@ -100,6 +103,7 @@ class User(Base):
 
     tenders = relationship("Tender", back_populates="officer", foreign_keys="Tender.officer_id")
     review_tasks = relationship("ReviewTask", back_populates="assigned_user")
+    bidder_profile = relationship("Bidder", back_populates="user_account", foreign_keys="Bidder.user_id", uselist=False)
 
 
 class Tender(Base):
@@ -119,6 +123,8 @@ class Tender(Base):
     file_type = Column(String(20))
     ocr_status = Column(SAEnum(OCRStatus), default=OCRStatus.PENDING)
     processing_job_id = Column(String(100))
+    # Password gate for viewing bidder applications
+    view_password_hash = Column(String(255))
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -157,6 +163,8 @@ class Bidder(Base):
 
     bidder_id = Column(String(36), primary_key=True, default=gen_uuid)
     tender_id = Column(String(36), ForeignKey("tenders.tender_id"), nullable=False)
+    # Link to the BIDDER role user account (optional — set when bidder self-registers)
+    user_id = Column(String(36), ForeignKey("users.user_id"), nullable=True)
     company_name = Column(String(500), nullable=False)
     gstin = Column(String(20))
     pan = Column(String(15))
@@ -168,6 +176,7 @@ class Bidder(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     tender = relationship("Tender", back_populates="bidders")
+    user_account = relationship("User", back_populates="bidder_profile", foreign_keys=[user_id])
     documents = relationship("BidderDocument", back_populates="bidder", cascade="all, delete-orphan")
     evidence_records = relationship("BidderEvidence", back_populates="bidder")
     verdicts = relationship("CriterionVerdict", back_populates="bidder")
@@ -192,6 +201,8 @@ class BidderDocument(Base):
     extracted_text_preview = Column(Text)
     upload_time = Column(DateTime, default=datetime.utcnow)
     processed_at = Column(DateTime)
+    # Uploaded by — tracks which user uploaded (must be the bidder's own account)
+    uploaded_by = Column(String(36), ForeignKey("users.user_id"), nullable=True)
 
     bidder = relationship("Bidder", back_populates="documents")
     chunks = relationship("DocumentChunk", back_populates="document", cascade="all, delete-orphan")
