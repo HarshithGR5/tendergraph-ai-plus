@@ -1,5 +1,5 @@
 import apiClient from "./client";
-import type { Bidder, BidderDocument, BidderEvidence } from "@/lib/types";
+import type { Bidder, BidderSubmission, BidderDocument, BidderEvidence } from "@/lib/types";
 
 export const biddersApi = {
   list: async (tenderId: string): Promise<Bidder[]> => {
@@ -39,8 +39,8 @@ export const biddersApi = {
     return data;
   },
 
-  getMySubmissions: async (): Promise<Bidder[]> => {
-    const { data } = await apiClient.get<Bidder[]>("/api/bidder/my-submissions");
+  getMySubmissions: async (): Promise<BidderSubmission[]> => {
+    const { data } = await apiClient.get<BidderSubmission[]>("/api/bidder/my-submissions");
     return data;
   },
 

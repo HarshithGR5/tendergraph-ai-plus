@@ -27,6 +27,7 @@ const ROLE_BADGE: Record<UserRole, { label: string; color: string }> = {
   SENIOR_OFFICER:      { label: "Senior Officer",       color: "text-purple-600 bg-purple-50 border-purple-200" },
   SYSTEM_ADMIN:        { label: "System Admin",          color: "text-rose-600   bg-rose-50   border-rose-200"   },
   AUDIT_REVIEWER:      { label: "Audit Reviewer",        color: "text-amber-600  bg-amber-50  border-amber-200"  },
+  BIDDER:              { label: "Bidder",                color: "text-teal-600   bg-teal-50   border-teal-200"   },
 };
 
 export function Header() {

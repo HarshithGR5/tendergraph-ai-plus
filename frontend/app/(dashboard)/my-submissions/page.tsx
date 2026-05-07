@@ -4,13 +4,14 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import { FolderOpen, FileText, CheckCircle, Clock, AlertTriangle, ChevronRight } from "lucide-react";
 import { biddersApi } from "@/lib/api/bidders";
+import type { BidderSubmission } from "@/lib/types";
 import { VerdictBadge } from "@/components/ui/badge";
 import { CardSkeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
 import { formatDate } from "@/lib/utils";
 
 export default function MySubmissionsPage() {
-  const { data: submissions = [], isLoading } = useQuery({
+  const { data: submissions = [], isLoading } = useQuery<BidderSubmission[]>({
     queryKey: ["my-submissions"],
     queryFn: biddersApi.getMySubmissions,
     refetchInterval: 15_000,

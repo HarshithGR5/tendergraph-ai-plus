@@ -46,7 +46,7 @@ export default function ReportsPage({ params }: { params: Promise<{ id: string }
     const a = document.createElement("a");
     a.href = url;
     a.setAttribute("download", `TenderGraph_Report_${reportId}.pdf`);
-    const headers = token ? { Authorization: `Bearer ${token}` } : {};
+    const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
     fetch(url, { headers })
       .then((r) => r.blob())
       .then((blob) => {

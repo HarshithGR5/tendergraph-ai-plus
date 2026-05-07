@@ -17,6 +17,8 @@ const EVENT_CONFIG: Record<AuditEventType, { icon: React.ElementType; color: str
   HUMAN_OVERRIDE_APPLIED: { icon: User, color: "bg-orange-100 text-orange-600", label: "Human Override" },
   REPORT_EXPORTED: { icon: FileText, color: "bg-emerald-100 text-emerald-600", label: "Report Exported" },
   USER_LOGIN: { icon: LogIn, color: "bg-slate-100 text-slate-500", label: "User Login" },
+  BIDDER_REGISTERED: { icon: User, color: "bg-teal-100 text-teal-600", label: "Bidder Registered" },
+  BIDDER_DOC_VIEWED: { icon: Eye, color: "bg-slate-100 text-slate-500", label: "Document Viewed" },
 };
 
 function AuditEventRow({ event, index }: { event: AuditEvent; index: number }) {

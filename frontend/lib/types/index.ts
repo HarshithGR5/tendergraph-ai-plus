@@ -86,6 +86,18 @@ export interface Bidder {
   document_count: number;
 }
 
+export interface BidderSubmission {
+  bidder_id: string;
+  tender_id: string;
+  tender_title: string | null;
+  company_name: string;
+  gstin: string | null;
+  overall_verdict: OverallVerdict;
+  processing_complete: boolean;
+  submission_timestamp: string;
+  document_count: number;
+}
+
 export interface BidderDocument {
   doc_id: string;
   bidder_id: string;
