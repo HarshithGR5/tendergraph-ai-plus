@@ -3,10 +3,11 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/lib/stores/authStore";
+import { useSidebarStore } from "@/lib/stores/sidebarStore";
 import {
   LayoutDashboard, FileText, Shield, ClipboardCheck,
   LogOut, ChevronRight, Cpu, Settings, Eye,
-  Activity, Building2, FolderOpen
+  Activity, Building2, FolderOpen, X
 } from "lucide-react";
 import type { UserRole } from "@/lib/types";
 
@@ -60,10 +61,13 @@ const ROLE_META: Record<UserRole, { label: string; color: string; icon: React.El
   BIDDER:              { label: "Bidder",                color: "bg-teal-500",   icon: Building2       },
 };
 
-function NavLink({ href, icon: Icon, label, active }: { href: string; icon: React.ElementType; label: string; active: boolean }) {
+function NavLink({ href, icon: Icon, label, active, onNavigate }: {
+  href: string; icon: React.ElementType; label: string; active: boolean; onNavigate?: () => void;
+}) {
   return (
     <Link
       href={href}
+      onClick={onNavigate}
       className={cn(
         "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all group",
         active
@@ -82,6 +86,7 @@ export function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const { user, clearAuth } = useAuthStore();
+  const { open, close } = useSidebarStore();
   const role = user?.role as UserRole | undefined;
 
   const isActive = (href: string) =>
@@ -98,14 +103,15 @@ export function Sidebar() {
 
   function handleSignOut() {
     clearAuth();
+    close();
     router.push("/");
   }
 
-  return (
-    <aside className="fixed left-0 top-0 h-full w-[240px] bg-[#0f172a] flex flex-col z-40 border-r border-[#1e293b]">
+  const sidebarContent = (
+    <aside className="h-full w-[240px] bg-[#0f172a] flex flex-col border-r border-[#1e293b]">
       {/* Logo */}
-      <div className="px-5 py-4 border-b border-[#1e293b]">
-        <Link href="/dashboard" className="flex items-center gap-2.5 hover:opacity-80 transition-opacity">
+      <div className="px-5 py-4 border-b border-[#1e293b] flex items-center justify-between">
+        <Link href="/dashboard" onClick={close} className="flex items-center gap-2.5 hover:opacity-80 transition-opacity">
           <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center flex-shrink-0">
             <Cpu className="w-4 h-4 text-white" />
           </div>
@@ -114,6 +120,12 @@ export function Sidebar() {
             <div className="text-blue-400 text-[10px] font-semibold tracking-wider">AI+ PLATFORM</div>
           </div>
         </Link>
+        <button
+          onClick={close}
+          className="md:hidden w-7 h-7 rounded-lg hover:bg-[#1e293b] flex items-center justify-center text-slate-400"
+        >
+          <X className="w-4 h-4" />
+        </button>
       </div>
 
       {/* Nav */}
@@ -124,7 +136,7 @@ export function Sidebar() {
               Bidder Portal
             </p>
             {BIDDER_NAV.map((item) => (
-              <NavLink key={item.href} {...item} active={isActive(item.href)} />
+              <NavLink key={item.href} {...item} active={isActive(item.href)} onNavigate={close} />
             ))}
           </>
         ) : isAuditReviewer ? (
@@ -132,38 +144,35 @@ export function Sidebar() {
             <p className="text-[10px] font-semibold text-slate-600 uppercase tracking-wider px-2 mb-2">
               Audit
             </p>
-            <NavLink href="/audit" icon={Shield} label="Audit Trail" active={isActive("/audit")} />
+            <NavLink href="/audit" icon={Shield} label="Audit Trail" active={isActive("/audit")} onNavigate={close} />
           </>
         ) : (
           <>
-            {/* Procurement group */}
             <p className="text-[10px] font-semibold text-slate-600 uppercase tracking-wider px-2 mb-2">
               Procurement
             </p>
             {OFFICER_NAV.map((item) => (
-              <NavLink key={item.href} {...item} active={isActive(item.href)} />
+              <NavLink key={item.href} {...item} active={isActive(item.href)} onNavigate={close} />
             ))}
 
-            {/* Review group */}
             {REVIEW_NAV.filter(canSee).length > 0 && (
               <>
                 <p className="text-[10px] font-semibold text-slate-600 uppercase tracking-wider px-2 mb-2 mt-5">
                   Review
                 </p>
                 {REVIEW_NAV.filter(canSee).map((item) => (
-                  <NavLink key={item.href} {...item} active={isActive(item.href)} />
+                  <NavLink key={item.href} {...item} active={isActive(item.href)} onNavigate={close} />
                 ))}
               </>
             )}
 
-            {/* System group */}
             {SYSTEM_NAV.filter(canSee).length > 0 && (
               <>
                 <p className="text-[10px] font-semibold text-slate-600 uppercase tracking-wider px-2 mb-2 mt-5">
                   System
                 </p>
                 {SYSTEM_NAV.filter(canSee).map((item) => (
-                  <NavLink key={item.href} {...item} active={isActive(item.href)} />
+                  <NavLink key={item.href} {...item} active={isActive(item.href)} onNavigate={close} />
                 ))}
               </>
             )}
@@ -201,5 +210,27 @@ export function Sidebar() {
         </div>
       </div>
     </aside>
+  );
+
+  return (
+    <>
+      {/* Desktop sidebar — always visible */}
+      <div className="hidden md:block fixed left-0 top-0 h-full z-40">
+        {sidebarContent}
+      </div>
+
+      {/* Mobile sidebar — overlay when open */}
+      {open && (
+        <>
+          <div
+            className="md:hidden fixed inset-0 bg-black/50 z-40"
+            onClick={close}
+          />
+          <div className="md:hidden fixed left-0 top-0 h-full z-50">
+            {sidebarContent}
+          </div>
+        </>
+      )}
+    </>
   );
 }

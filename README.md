@@ -41,6 +41,7 @@ cd frontend && npm run dev -- --port 5000
 ```
 
 - **API docs**: `http://localhost:8000/api/docs`
+- **Postman collection**: `TenderGraph_API.postman_collection.json` (import into Postman)
 - **Health check**: `GET /api/health`
 
 ---
@@ -56,7 +57,7 @@ cd frontend && npm run dev -- --port 5000
 | Auth | JWT (python-jose) + bcrypt 4.0.1 (pinned) |
 | LLM/OCR | GPT-4o (OpenAI) via structured JSON output |
 | PDF parsing | PyMuPDF + pdfplumber (native), GPT-4o Vision (scanned) |
-| Reports | ReportLab PDF generation |
+| Reports | ReportLab PDF generation (streamed — no disk storage) |
 | Frontend | Next.js 15 + React 19 + TypeScript + Tailwind CSS v4 |
 | State | Zustand + React Query |
 | Charts | Recharts |
@@ -67,8 +68,8 @@ cd frontend && npm run dev -- --port 5000
 
 | Role | Key Capabilities |
 |------|----------------|
-| `BIDDER` | Self-register to open tenders, upload own company documents, track submission status and verdict |
-| `PROCUREMENT_OFFICER` | View tenders and bidder lists, trigger AI evaluation, manage review tasks |
+| `BIDDER` | Self-register to open tenders, upload documents, confirm & lock submission, track KYC and verdict |
+| `PROCUREMENT_OFFICER` | View tenders and bidder lists, trigger AI evaluation (single or bulk), manage review tasks |
 | `SENIOR_OFFICER` | Upload tenders, approve extracted criteria, override AI verdicts (all logged), sign reports |
 | `SYSTEM_ADMIN` | All Senior Officer permissions + user management, system config, full audit access |
 | `AUDIT_REVIEWER` | Read-only access to audit trail and SHA-256 hash-chain verification |
@@ -93,14 +94,76 @@ cd frontend && npm run dev -- --port 5000
 
 ---
 
-## Bidder Self-Registration Flow
+## Bidder Submission Flow
 
 1. Bidder creates an account with role `BIDDER`
 2. Browses the public list of open tenders from the dashboard
 3. Self-registers to a tender by providing company details (name, GSTIN, PAN, etc.)
-4. Uploads their own submission documents directly to their bidder profile
-5. Officers trigger AI evaluation; bidder can track overall verdict status
-6. Every upload and access event is logged to the tamper-evident audit trail
+4. Uploads submission documents — can delete and re-upload freely while in **Draft** state
+5. Clicks **Confirm & Lock** → submission is locked, no further uploads/deletions allowed
+6. KYC verification (GSTIN, PAN, debarment check) runs automatically in the background
+7. A procurement officer triggers AI evaluation (single bidder or **Evaluate All**)
+8. Bidder can track overall verdict and KYC status on the tender page
+
+---
+
+## Key API Endpoints
+
+### Authentication
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/api/auth/register` | Create account (role in body) |
+| `POST` | `/api/auth/login` | Login — returns JWT |
+| `GET`  | `/api/auth/me` | Current user info |
+
+### Tenders
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET`  | `/api/tenders/` | List all tenders |
+| `POST` | `/api/tenders/` | Upload tender PDF/DOCX (Senior+) |
+| `GET`  | `/api/tenders/{id}` | Get tender detail |
+| `DELETE` | `/api/tenders/{id}` | Delete tender (Admin only) |
+| `GET`  | `/api/tenders/{id}/criteria` | List extracted criteria |
+| `POST` | `/api/tenders/{id}/criteria` | Add criterion manually |
+| `PATCH`| `/api/tenders/{id}/criteria/{cid}` | Update criterion |
+| `POST` | `/api/tenders/{id}/criteria/approve-all` | Approve all criteria |
+| `POST` | `/api/tenders/{id}/criteria/{cid}/approve` | Approve single criterion |
+| `DELETE` | `/api/tenders/{id}/criteria/{cid}` | Delete criterion |
+
+### Bidders
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET`  | `/api/tenders/{id}/bidders/` | List bidders for tender |
+| `POST` | `/api/tenders/{id}/bidders/self-register` | Bidder self-registers |
+| `GET`  | `/api/tenders/{id}/bidders/my-registration` | My registration for this tender |
+| `POST` | `/api/tenders/{id}/bidders/{bid}/documents` | Upload document |
+| `DELETE`| `/api/tenders/{id}/bidders/{bid}/documents/{did}` | Delete document (draft only) |
+| `POST` | `/api/tenders/{id}/bidders/{bid}/confirm-submission` | Lock submission + trigger KYC |
+| `POST` | `/api/tenders/{id}/bidders/{bid}/evaluate` | Trigger single evaluation |
+| `POST` | `/api/tenders/{id}/bidders/evaluate-all` | Evaluate all bidders (bulk) |
+
+### Verdicts & Reviews
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET`  | `/api/tenders/{id}/matrix` | Bidder × criterion matrix |
+| `POST` | `/api/tenders/{id}/bidders/{bid}/verdicts/{vid}/override` | Override verdict (Senior+) |
+| `GET`  | `/api/tenders/{id}/reviews/` | Review tasks for tender |
+| `POST` | `/api/tenders/{id}/reviews/{tid}/resolve` | Resolve review task |
+
+### Reports (Streaming PDF)
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/api/tenders/{id}/reports/generate` | Generate + stream PDF (no disk write) |
+| `GET`  | `/api/tenders/{id}/reports/` | List generated reports |
+| `GET`  | `/api/tenders/{id}/reports/{rid}/download` | Re-stream existing report |
+
+### KYC
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/api/kyc/verify-gstin` | Validate GSTIN format + sandbox check |
+| `POST` | `/api/kyc/verify-pan` | Validate PAN format |
+| `POST` | `/api/kyc/check-debarment` | Check debarment registry |
+| `POST` | `/api/kyc/full-check` | Run all KYC checks in one call |
 
 ---
 
@@ -108,9 +171,12 @@ cd frontend && npm run dev -- --port 5000
 
 - **AI extraction ≠ final verdict**: GPT-4o extracts structured evidence; a deterministic Python rule engine makes all eligibility decisions. Reproducible and legally defensible.
 - **Confidence gating**: Extractions with confidence < 0.60 are escalated to `NEEDS_MANUAL_REVIEW` — no bidder is silently disqualified.
+- **Submission locking**: Bidders must explicitly confirm their submission. After confirmation, documents are immutable. This prevents post-evaluation manipulation.
+- **KYC auto-trigger**: Submission confirmation automatically runs GSTIN, PAN, and debarment verification in the background. Results surface as a KYC badge in the officer view.
+- **Bulk evaluation**: Officers can trigger evaluation for all registered bidders with one button / one API call.
+- **Streaming PDF reports**: Reports are generated on-demand and streamed directly — no disk I/O, no storage needed.
 - **Immutable audit trail**: `audit_events` table is append-only with SHA-256 hash chaining. Tamper-evident, verifiable by any external auditor.
 - **Document ownership**: Bidder documents can only be uploaded by the bidder's own account. Officers have zero write access to bidder document storage — enforced at the API layer.
-- **Local storage first**: All uploaded documents stored to `./backend/storage/`. No cloud object storage dependency.
 - **bcrypt pinned at 4.0.1**: passlib[bcrypt] with bcrypt==4.0.1 is required. Do not upgrade.
 
 ---
@@ -132,35 +198,44 @@ backend/
 ├── main.py               # FastAPI app + router registration
 ├── config.py             # Pydantic settings (env-based)
 ├── database.py           # SQLAlchemy engine + session
-├── models/tables.py      # All ORM models — UserRole includes BIDDER
+├── models/tables.py      # All ORM models (10 tables)
 ├── api/
 │   ├── auth.py           # Register, login, JWT, require_role() guard
-│   ├── tenders.py        # Upload (Senior+ only), criteria approve (Senior+ only), view password
-│   ├── bidders.py        # Bidder self-register, document upload (BIDDER only, own profile)
+│   ├── tenders.py        # Upload (Senior+ only), criteria approve, view password
+│   ├── bidders.py        # Self-register, document upload, confirm-submission, evaluate-all
 │   ├── verdicts.py       # Evaluation matrix, verdict override (Senior+ only)
 │   ├── reviews.py        # Review queue; resolve locked to Senior+ only
-│   ├── global_reviews.py # Cross-tender review queue (internal staff only)
-│   ├── reports.py        # PDF report generation
-│   └── audit.py          # Audit trail + hash-chain verification
-├── services/             # tender_parser, ocr_engine, extraction_service, rule_engine, audit_service
+│   ├── global_reviews.py # Cross-tender review queue
+│   ├── reports.py        # Streaming PDF report generation
+│   ├── audit.py          # Per-tender audit trail + hash-chain verification
+│   ├── global_audit.py   # Global audit trail
+│   ├── bidder_portal.py  # BIDDER-only portal views
+│   └── kyc.py            # GSTIN, PAN, debarment, full-check endpoints
+├── services/             # tender_parser, ocr_engine, extraction_service, rule_engine, audit_service, kyc_service
 ├── rules/                # Deterministic rule functions: financial, technical, compliance
-├── prompts/              # Jinja2 prompt templates
+├── prompts/              # Jinja2 prompt templates: criterion_extract.j2, evidence_extract.j2
 ├── alembic/              # Alembic env + migration versions
-└── storage/              # Local file storage (tenders/, bidders/, reports/)
+└── storage/              # Local file storage (tenders/, bidders/)
 
 frontend/
 ├── app/
-│   ├── page.tsx          # Public landing page (5 roles, workflow, features)
-│   ├── login/            # Sign-in page with 5-role legend panel
-│   ├── register/         # Account creation — 5 roles including BIDDER
-│   ├── presentation/     # Platform overview slide deck (20 slides, no hackathon references)
+│   ├── page.tsx          # Public landing page
+│   ├── login/            # Sign-in with role legend + clickable demo credentials
+│   ├── register/         # Account creation with role selector (5 roles)
 │   └── (dashboard)/      # All authenticated views (role-gated)
 ├── components/
-│   ├── layout/           # Sidebar (role-aware — BIDDER gets own Bidder Portal nav)
-│   └── ...
+│   ├── layout/           # Sidebar (role-aware) + Header (role badge)
+│   ├── dashboard/        # Metric cards + charts
+│   ├── tenders/          # Tender cards + upload modal + criterion cards
+│   ├── matrix/           # Bidder comparison matrix + evidence drawer
+│   ├── reviews/          # Review task cards
+│   ├── audit/            # Audit timeline
+│   └── ui/               # Badge · skeleton · empty-state · confidence-meter
 └── lib/
-    ├── types/index.ts    # UserRole includes "BIDDER"
-    └── ...
+    ├── api/              # Typed API wrappers for every endpoint
+    ├── stores/           # Zustand auth store
+    ├── types/            # TypeScript interfaces matching backend models
+    └── utils.ts          # Currency · date · confidence formatters · rule name map
 ```
 
 ---
@@ -172,4 +247,6 @@ frontend/
 - OCR for scanned PDFs uses GPT-4o Vision — costs API credits per page.
 - Alembic ini file is at `backend/alembic.ini`, not the project root.
 - Criterion verdicts have a unique constraint on `(bidder_id, criterion_id)` — re-running evaluation updates existing records.
-- Bidder document upload is locked to the BIDDER account that owns the profile; the `uploaded_by` column on `bidder_documents` records which user uploaded each file.
+- Bidder document upload is locked to the BIDDER account that owns the profile.
+- Document deletion is blocked after `submission_confirmed = true`.
+- The `evaluate-all` endpoint queues evaluations for all bidders; `triggered_count` in the response shows how many were queued.

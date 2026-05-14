@@ -287,6 +287,46 @@ def update_criterion(
     return criterion
 
 
+@router.delete("/{tender_id}", status_code=204)
+def delete_tender(
+    tender_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role(UserRole.SENIOR_OFFICER, UserRole.SYSTEM_ADMIN)),
+):
+    """
+    Delete a tender. Only allowed if no bidders have registered for it yet.
+    This prevents accidental deletion once evaluation is underway.
+    """
+    tender = db.query(Tender).filter(Tender.tender_id == tender_id).first()
+    if not tender:
+        raise HTTPException(status_code=404, detail="Tender not found.")
+
+    if tender.bidders:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Cannot delete tender with {len(tender.bidders)} registered bidder(s). Bidders must be removed first."
+        )
+
+    audit_service.log_event(
+        db=db,
+        event_type=AuditEventType.TENDER_DELETED,
+        actor_id=current_user.user_id,
+        actor_type="HUMAN",
+        payload={"tender_id": tender_id, "title": tender.title},
+        tender_id=tender_id,
+    )
+
+    storage = tender.storage_path
+    db.delete(tender)
+    db.commit()
+
+    try:
+        if storage:
+            Path(storage).unlink(missing_ok=True)
+    except Exception:
+        pass
+
+
 @router.post("/{tender_id}/criteria/approve-all", response_model=dict)
 def approve_all_criteria(
     tender_id: str,

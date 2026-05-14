@@ -21,7 +21,6 @@ from backend.services.extraction_service import extract_evidence_for_criterion
 
 router = APIRouter(prefix="/tenders/{tender_id}/bidders", tags=["bidders"])
 
-# Internal staff who can VIEW bidder list and trigger evaluation
 EVALUATION_ROLES = (UserRole.PROCUREMENT_OFFICER, UserRole.SENIOR_OFFICER, UserRole.SYSTEM_ADMIN)
 
 
@@ -43,6 +42,8 @@ class BidderOut(BaseModel):
     contact_name: Optional[str]
     overall_verdict: OverallVerdict
     processing_complete: bool
+    submission_confirmed: bool = False
+    kyc_status: Optional[str] = None
     submission_timestamp: datetime
     document_count: Optional[int] = 0
 
@@ -157,6 +158,40 @@ def _process_document_bg(doc_id: str):
         db.close()
 
 
+def _run_kyc_for_bidder(bidder: Bidder, db) -> str:
+    """Run full KYC for a bidder and persist result. Returns overall KYC status string."""
+    try:
+        from backend.services.kyc_service import run_full_kyc
+        result = run_full_kyc(
+            company_name=bidder.company_name,
+            gstin=bidder.gstin,
+            pan=bidder.pan,
+            sandbox=True,
+        )
+        status = result.get("overall_kyc_status", "REVIEW")
+        bidder.kyc_status = status
+        bidder.kyc_run_at = datetime.utcnow()
+        db.flush()
+        audit_service.log_event(
+            db=db,
+            event_type=AuditEventType.KYC_COMPLETED,
+            actor_id="SYSTEM",
+            payload={
+                "bidder_id": bidder.bidder_id,
+                "kyc_status": status,
+                "sandbox_mode": result.get("sandbox_mode", True),
+                "issues": result.get("issues", []),
+            },
+            tender_id=bidder.tender_id,
+            bidder_id=bidder.bidder_id,
+        )
+        return status
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning(f"KYC run failed for bidder {bidder.bidder_id}: {e}")
+        return "REVIEW"
+
+
 def _run_extraction_and_rules_bg(bidder_id: str):
     from backend.database import SessionLocal
     from backend.services.rule_engine import evaluate_bidder
@@ -165,6 +200,11 @@ def _run_extraction_and_rules_bg(bidder_id: str):
         bidder = db.query(Bidder).filter(Bidder.bidder_id == bidder_id).first()
         if not bidder:
             return
+        # Auto-run KYC before evaluation if not yet done
+        if not bidder.kyc_status:
+            _run_kyc_for_bidder(bidder, db)
+            db.commit()
+
         tender = bidder.tender
         approved_criteria = [c for c in tender.criteria if c.is_approved]
         for criterion in approved_criteria:
@@ -190,7 +230,6 @@ def self_register_bidder(
     if not tender:
         raise HTTPException(status_code=404, detail="Tender not found.")
 
-    # Prevent a bidder from registering to the same tender twice
     existing = db.query(Bidder).filter(
         Bidder.tender_id == tender_id,
         Bidder.user_id == current_user.user_id
@@ -269,7 +308,6 @@ def get_bidder(
     bidder = db.query(Bidder).filter(Bidder.bidder_id == bidder_id, Bidder.tender_id == tender_id).first()
     if not bidder:
         raise HTTPException(status_code=404, detail="Bidder not found.")
-    # Bidders can only see their own record
     if current_user.role == UserRole.BIDDER and bidder.user_id != current_user.user_id:
         raise HTTPException(status_code=403, detail="Access denied.")
     out = BidderOut.model_validate(bidder)
@@ -293,9 +331,14 @@ def upload_document(
     if not bidder:
         raise HTTPException(status_code=404, detail="Bidder not found.")
 
-    # Strict ownership check — must be the bidder's own account
     if bidder.user_id != current_user.user_id:
         raise HTTPException(status_code=403, detail="You can only upload documents to your own bidder profile.")
+
+    if bidder.submission_confirmed:
+        raise HTTPException(
+            status_code=409,
+            detail="Submission is locked. You cannot upload documents after confirming your submission. Contact the procurement officer if you need to make changes."
+        )
 
     file.file.seek(0, 2)
     file_size = file.file.tell()
@@ -333,7 +376,7 @@ def upload_document(
     return doc
 
 
-# ── Documents list: internal staff (after password check) OR own bidder ───────
+# ── Documents list: internal staff OR own bidder ───────────────────────────────
 @router.get("/{bidder_id}/documents", response_model=List[DocumentOut])
 def list_documents(
     tender_id: str,
@@ -366,9 +409,177 @@ def trigger_evaluation(
     if not bidder:
         raise HTTPException(status_code=404, detail="Bidder not found.")
     background_tasks.add_task(_run_extraction_and_rules_bg, bidder_id)
-    return {"status": "evaluation_triggered", "bidder_id": bidder_id}
+    return {
+        "status": "evaluation_triggered",
+        "bidder_id": bidder_id,
+        "submission_confirmed": bidder.submission_confirmed,
+        "kyc_auto_run": True,
+    }
 
 
+# ── Bulk evaluate all bidders in a tender ─────────────────────────────────────
+@router.post("/evaluate-all", response_model=dict)
+def evaluate_all_bidders(
+    tender_id: str,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role(
+        UserRole.PROCUREMENT_OFFICER, UserRole.SENIOR_OFFICER, UserRole.SYSTEM_ADMIN
+    )),
+):
+    """Trigger evaluation for every registered bidder in this tender in one shot."""
+    tender = db.query(Tender).filter(Tender.tender_id == tender_id).first()
+    if not tender:
+        raise HTTPException(status_code=404, detail="Tender not found.")
+
+    bidders = tender.bidders
+    if not bidders:
+        raise HTTPException(status_code=400, detail="No bidders registered for this tender.")
+
+    approved_criteria = [c for c in tender.criteria if c.is_approved]
+    if not approved_criteria:
+        raise HTTPException(status_code=400, detail="No approved criteria — approve criteria before running evaluation.")
+
+    triggered = []
+    for bidder in bidders:
+        background_tasks.add_task(_run_extraction_and_rules_bg, bidder.bidder_id)
+        triggered.append(bidder.bidder_id)
+
+    return {
+        "status": "bulk_evaluation_triggered",
+        "tender_id": tender_id,
+        "triggered_count": len(triggered),
+        "bidder_ids": triggered,
+    }
+
+
+# ── Confirm submission: BIDDER role, own record only ──────────────────────────
+@router.post("/{bidder_id}/confirm-submission", response_model=dict)
+def confirm_submission(
+    tender_id: str,
+    bidder_id: str,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role(UserRole.BIDDER)),
+):
+    """
+    Bidder locks their submission. After this:
+    - No more document uploads or deletes allowed
+    - KYC check runs automatically in the background
+    - Officer can now trigger eligibility evaluation
+    """
+    bidder = db.query(Bidder).filter(Bidder.bidder_id == bidder_id, Bidder.tender_id == tender_id).first()
+    if not bidder:
+        raise HTTPException(status_code=404, detail="Bidder not found.")
+    if bidder.user_id != current_user.user_id:
+        raise HTTPException(status_code=403, detail="You can only confirm your own submission.")
+    if bidder.submission_confirmed:
+        raise HTTPException(status_code=409, detail="Submission already confirmed.")
+
+    if not bidder.documents:
+        raise HTTPException(status_code=400, detail="Please upload at least one document before confirming your submission.")
+
+    bidder.submission_confirmed = True
+    bidder.submission_confirmed_at = datetime.utcnow()
+    db.commit()
+
+    audit_service.log_event(
+        db=db,
+        event_type=AuditEventType.SUBMISSION_CONFIRMED,
+        actor_id=current_user.user_id,
+        actor_type="HUMAN",
+        payload={
+            "bidder_id": bidder_id,
+            "company_name": bidder.company_name,
+            "document_count": len(bidder.documents),
+        },
+        tender_id=tender_id,
+        bidder_id=bidder_id,
+    )
+
+    # Run KYC in background immediately after confirmation
+    background_tasks.add_task(_run_kyc_bg, bidder_id)
+
+    return {
+        "status": "submission_confirmed",
+        "bidder_id": bidder_id,
+        "company_name": bidder.company_name,
+        "document_count": len(bidder.documents),
+        "kyc_status": "running",
+        "message": "Submission locked. KYC verification is running in the background.",
+    }
+
+
+def _run_kyc_bg(bidder_id: str):
+    """Background task to run KYC for a bidder after submission confirmation."""
+    from backend.database import SessionLocal
+    db = SessionLocal()
+    try:
+        bidder = db.query(Bidder).filter(Bidder.bidder_id == bidder_id).first()
+        if not bidder:
+            return
+        _run_kyc_for_bidder(bidder, db)
+        db.commit()
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).exception(f"Background KYC failed for bidder {bidder_id}: {e}")
+    finally:
+        db.close()
+
+
+# ── Document delete: BIDDER only, pre-confirmation ────────────────────────────
+@router.delete("/{bidder_id}/documents/{doc_id}", status_code=204)
+def delete_document(
+    tender_id: str,
+    bidder_id: str,
+    doc_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role(UserRole.BIDDER)),
+):
+    """
+    Bidder can delete their own documents only before submission is confirmed.
+    After confirmation the submission is locked.
+    """
+    bidder = db.query(Bidder).filter(Bidder.bidder_id == bidder_id, Bidder.tender_id == tender_id).first()
+    if not bidder:
+        raise HTTPException(status_code=404, detail="Bidder not found.")
+    if bidder.user_id != current_user.user_id:
+        raise HTTPException(status_code=403, detail="You can only delete documents from your own bidder profile.")
+
+    if bidder.submission_confirmed:
+        raise HTTPException(
+            status_code=409,
+            detail="Submission is locked. Documents cannot be deleted after confirming your submission. Contact the procurement officer if there is an error."
+        )
+
+    doc = db.query(BidderDocument).filter(BidderDocument.doc_id == doc_id, BidderDocument.bidder_id == bidder_id).first()
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found.")
+
+    filename = doc.original_filename or doc.filename
+    storage = doc.storage_path
+
+    audit_service.log_event(
+        db=db,
+        event_type=AuditEventType.DOCUMENT_DELETED,
+        actor_id=current_user.user_id,
+        actor_type="HUMAN",
+        payload={"doc_id": doc_id, "bidder_id": bidder_id, "filename": filename},
+        tender_id=tender_id,
+        bidder_id=bidder_id,
+    )
+
+    db.delete(doc)
+    db.commit()
+
+    try:
+        if storage:
+            Path(storage).unlink(missing_ok=True)
+    except Exception:
+        pass
+
+
+# ── Evidence list: internal staff only ────────────────────────────────────────
 @router.get("/{bidder_id}/evidence", response_model=List[EvidenceOut])
 def get_evidence(
     tender_id: str,

@@ -1,12 +1,15 @@
 "use client";
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Shield, Brain, User, FileText, CheckCircle, LogIn, Hash, ChevronDown, ChevronUp, Eye } from "lucide-react";
+import { Shield, Brain, User, FileText, CheckCircle, LogIn, Hash, ChevronDown, ChevronUp, Eye,Trash2,Trash,} from "lucide-react";
 import { formatDateTime, cn } from "@/lib/utils";
 import type { AuditEvent, AuditEventType } from "@/lib/types";
 
+
 const EVENT_CONFIG: Record<AuditEventType, { icon: React.ElementType; color: string; label: string }> = {
   TENDER_UPLOADED: { icon: FileText, color: "bg-blue-100 text-blue-600", label: "Tender Uploaded" },
+  TENDER_DELETED: {icon: Trash2,color: "bg-red-100 text-red-600",label: "Tender Deleted",},
+  DOCUMENT_DELETED: {icon: Trash,color: "bg-orange-100 text-orange-600",label: "Document Deleted",},
   CRITERION_EXTRACTED: { icon: Brain, color: "bg-purple-100 text-purple-600", label: "Criteria Extracted" },
   CRITERION_SCHEMA_APPROVED: { icon: CheckCircle, color: "bg-emerald-100 text-emerald-600", label: "Schema Approved" },
   BIDDER_UPLOADED: { icon: User, color: "bg-slate-100 text-slate-600", label: "Bidder Registered" },

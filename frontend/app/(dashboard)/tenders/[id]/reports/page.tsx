@@ -10,13 +10,12 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { TableSkeleton } from "@/components/ui/skeleton";
 import { formatDateTime } from "@/lib/utils";
 import { toast } from "sonner";
-import { useAuthStore } from "@/lib/stores/authStore";
 
 export default function ReportsPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const queryClient = useQueryClient();
-  const { token } = useAuthStore();
   const [generating, setGenerating] = useState(false);
+  const [downloading, setDownloading] = useState<string | null>(null);
 
   const { data: reports = [], isLoading } = useQuery({
     queryKey: ["reports", id],
@@ -31,9 +30,9 @@ export default function ReportsPage({ params }: { params: Promise<{ id: string }
   async function generate() {
     setGenerating(true);
     try {
-      await reportsApi.generate(id);
+      await reportsApi.generateAndDownload(id);
       queryClient.invalidateQueries({ queryKey: ["reports", id] });
-      toast.success("Report generated successfully");
+      toast.success("Report generated and downloaded");
     } catch {
       toast.error("Failed to generate report");
     } finally {
@@ -41,23 +40,15 @@ export default function ReportsPage({ params }: { params: Promise<{ id: string }
     }
   }
 
-  function downloadReport(reportId: string) {
-    const url = reportsApi.downloadUrl(id, reportId);
-    const a = document.createElement("a");
-    a.href = url;
-    a.setAttribute("download", `TenderGraph_Report_${reportId}.pdf`);
-    const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
-    fetch(url, { headers })
-      .then((r) => r.blob())
-      .then((blob) => {
-        const blobUrl = URL.createObjectURL(blob);
-        a.href = blobUrl;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(blobUrl);
-      })
-      .catch(() => toast.error("Failed to download report"));
+  async function downloadReport(reportId: string) {
+    setDownloading(reportId);
+    try {
+      await reportsApi.downloadById(id, reportId);
+    } catch {
+      toast.error("Failed to download report");
+    } finally {
+      setDownloading(null);
+    }
   }
 
   return (
@@ -75,11 +66,13 @@ export default function ReportsPage({ params }: { params: Promise<{ id: string }
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-base font-bold text-slate-800">Evaluation Reports</h2>
-          <p className="text-xs text-slate-500 mt-0.5">Digitally signed PDF reports with SHA-256 integrity hash</p>
+          <p className="text-xs text-slate-500 mt-0.5">Digitally signed PDF reports with SHA-256 integrity hash — downloads immediately</p>
         </div>
         <button onClick={generate} disabled={generating}
           className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 disabled:opacity-60 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors">
-          {generating ? <><Loader2 className="w-4 h-4 animate-spin" /> Generating…</> : <><FileText className="w-4 h-4" /> Generate Report</>}
+          {generating
+            ? <><Loader2 className="w-4 h-4 animate-spin" /> Generating…</>
+            : <><FileText className="w-4 h-4" /> Generate &amp; Download</>}
         </button>
       </div>
 
@@ -142,9 +135,13 @@ export default function ReportsPage({ params }: { params: Promise<{ id: string }
                       <CheckCircle className="w-3 h-3" /> Hash Verified
                     </div>
                   )}
-                  <button onClick={() => downloadReport(report.report_id)}
-                    className="flex items-center gap-2 text-xs px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-medium transition-colors">
-                    <Download className="w-3.5 h-3.5" /> Download PDF
+                  <button
+                    onClick={() => downloadReport(report.report_id)}
+                    disabled={downloading === report.report_id}
+                    className="flex items-center gap-2 text-xs px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-medium transition-colors disabled:opacity-60">
+                    {downloading === report.report_id
+                      ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Downloading…</>
+                      : <><Download className="w-3.5 h-3.5" /> Download PDF</>}
                   </button>
                 </div>
               </div>

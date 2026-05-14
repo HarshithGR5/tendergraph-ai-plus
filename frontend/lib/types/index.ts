@@ -82,6 +82,8 @@ export interface Bidder {
   contact_name: string | null;
   overall_verdict: OverallVerdict;
   processing_complete: boolean;
+  submission_confirmed: boolean;
+  kyc_status: "PASS" | "FAIL" | "REVIEW" | null;
   submission_timestamp: string;
   document_count: number;
 }
@@ -178,8 +180,38 @@ export interface GlobalReviewTask extends ReviewTask {
 export type AuditEventType =
   | "CRITERION_EXTRACTED" | "EVIDENCE_EXTRACTED" | "VERDICT_EMITTED"
   | "HUMAN_REVIEW_ASSIGNED" | "HUMAN_OVERRIDE_APPLIED" | "REPORT_EXPORTED"
-  | "USER_LOGIN" | "CRITERION_SCHEMA_APPROVED" | "TENDER_UPLOADED"
-  | "BIDDER_UPLOADED" | "BIDDER_REGISTERED" | "OCR_COMPLETED" | "BIDDER_DOC_VIEWED";
+  | "USER_LOGIN" | "CRITERION_SCHEMA_APPROVED" | "TENDER_UPLOADED" | "TENDER_DELETED"
+  | "BIDDER_UPLOADED" | "BIDDER_REGISTERED" | "OCR_COMPLETED" | "BIDDER_DOC_VIEWED"
+  | "DOCUMENT_DELETED";
+
+export interface KYCCheckResult {
+  valid_format: boolean;
+  status: string;
+  legal_name?: string | null;
+  name?: string | null;
+  state?: string | null;
+  registration_date?: string | null;
+  business_type?: string | null;
+  entity_type?: string | null;
+  source: string;
+  error?: string | null;
+  debarred?: boolean;
+  reason?: string | null;
+  order_date?: string | null;
+  expires?: string | null;
+  authority?: string | null;
+  mca_status?: string;
+}
+
+export interface KYCResult {
+  overall_kyc_status: "PASS" | "FAIL" | "REVIEW";
+  gstin_check: KYCCheckResult | null;
+  pan_check: KYCCheckResult | null;
+  debarment_check: KYCCheckResult;
+  company_status: KYCCheckResult;
+  issues: string[];
+  sandbox_mode: boolean;
+}
 
 export interface AuditEvent {
   event_id: string;

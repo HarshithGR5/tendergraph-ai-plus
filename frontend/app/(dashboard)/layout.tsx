@@ -24,8 +24,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     <div className="min-h-screen bg-slate-50">
       <Sidebar />
       <Header />
-      <main className="ml-[240px] pt-14 min-h-screen">
-        <div className="p-6">{children}</div>
+      {/* On desktop, offset by sidebar width. On mobile, full width under fixed header. */}
+      <main className="md:ml-[240px] pt-14 min-h-screen">
+        <div className="p-4 md:p-6">{children}</div>
       </main>
     </div>
   );

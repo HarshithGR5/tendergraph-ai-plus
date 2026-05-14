@@ -75,10 +75,14 @@ class AuditEventType(str, enum.Enum):
     USER_LOGIN = "USER_LOGIN"
     CRITERION_SCHEMA_APPROVED = "CRITERION_SCHEMA_APPROVED"
     TENDER_UPLOADED = "TENDER_UPLOADED"
+    TENDER_DELETED = "TENDER_DELETED"
     BIDDER_UPLOADED = "BIDDER_UPLOADED"
     BIDDER_REGISTERED = "BIDDER_REGISTERED"
     OCR_COMPLETED = "OCR_COMPLETED"
     BIDDER_DOC_VIEWED = "BIDDER_DOC_VIEWED"
+    DOCUMENT_DELETED = "DOCUMENT_DELETED"
+    SUBMISSION_CONFIRMED = "SUBMISSION_CONFIRMED"
+    KYC_COMPLETED = "KYC_COMPLETED"
 
 
 class UserRole(str, enum.Enum):
@@ -173,6 +177,10 @@ class Bidder(Base):
     submission_timestamp = Column(DateTime, default=datetime.utcnow)
     overall_verdict = Column(SAEnum(OverallVerdict), default=OverallVerdict.PENDING)
     processing_complete = Column(Boolean, default=False)
+    submission_confirmed = Column(Boolean, default=False)
+    submission_confirmed_at = Column(DateTime)
+    kyc_status = Column(String(10))
+    kyc_run_at = Column(DateTime)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     tender = relationship("Tender", back_populates="bidders")

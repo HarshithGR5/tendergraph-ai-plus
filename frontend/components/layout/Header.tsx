@@ -1,7 +1,8 @@
 "use client";
 import { usePathname } from "next/navigation";
-import { Shield, Bell, Cpu } from "lucide-react";
+import { Shield, Bell, Menu } from "lucide-react";
 import { useAuthStore } from "@/lib/stores/authStore";
+import { useSidebarStore } from "@/lib/stores/sidebarStore";
 import type { UserRole } from "@/lib/types";
 
 const PAGE_TITLES: Record<string, { title: string; subtitle: string }> = {
@@ -33,21 +34,33 @@ const ROLE_BADGE: Record<UserRole, { label: string; color: string }> = {
 export function Header() {
   const pathname = usePathname();
   const { user } = useAuthStore();
+  const { toggle } = useSidebarStore();
   const { title, subtitle } = getPageMeta(pathname);
   const role = user?.role as UserRole | undefined;
   const badge = role ? ROLE_BADGE[role] : null;
 
   return (
-    <header className="fixed top-0 right-0 left-[240px] h-14 bg-white border-b border-slate-200 flex items-center justify-between px-6 z-30">
-      <div className="min-w-0">
-        <h1 className="text-sm font-semibold text-slate-800 truncate">{title}</h1>
-        <p className="text-[11px] text-slate-500 truncate">{subtitle}</p>
+    <header className="fixed top-0 right-0 left-0 md:left-[240px] h-14 bg-white border-b border-slate-200 flex items-center justify-between px-4 md:px-6 z-30">
+      <div className="flex items-center gap-3 min-w-0">
+        {/* Hamburger — mobile only */}
+        <button
+          onClick={toggle}
+          className="md:hidden w-8 h-8 rounded-lg border border-slate-200 flex items-center justify-center hover:bg-slate-50 transition-colors flex-shrink-0"
+          aria-label="Toggle navigation"
+        >
+          <Menu className="w-4 h-4 text-slate-600" />
+        </button>
+
+        <div className="min-w-0">
+          <h1 className="text-sm font-semibold text-slate-800 truncate">{title}</h1>
+          <p className="text-[11px] text-slate-500 truncate hidden sm:block">{subtitle}</p>
+        </div>
       </div>
 
-      <div className="flex items-center gap-2.5 flex-shrink-0">
+      <div className="flex items-center gap-2 flex-shrink-0">
         {/* Role badge */}
         {badge && (
-          <span className={`hidden sm:inline-flex items-center text-[11px] font-medium px-2.5 py-1 rounded-full border ${badge.color}`}>
+          <span className={`hidden lg:inline-flex items-center text-[11px] font-medium px-2.5 py-1 rounded-full border ${badge.color}`}>
             {badge.label}
           </span>
         )}
@@ -64,7 +77,7 @@ export function Header() {
         </button>
 
         {/* Audit active */}
-        <div className="hidden md:flex items-center gap-1.5 text-[11px] text-slate-500 border border-slate-200 px-2.5 py-1 rounded-lg">
+        <div className="hidden lg:flex items-center gap-1.5 text-[11px] text-slate-500 border border-slate-200 px-2.5 py-1 rounded-lg">
           <Shield className="w-3 h-3" />
           Audit Active
         </div>

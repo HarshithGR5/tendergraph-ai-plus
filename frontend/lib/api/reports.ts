@@ -7,13 +7,36 @@ export const reportsApi = {
     return data;
   },
 
-  generate: async (tenderId: string): Promise<EvaluationReport> => {
-    const { data } = await apiClient.post<EvaluationReport>(`/api/tenders/${tenderId}/reports/generate`);
-    return data;
+  generateAndDownload: async (tenderId: string): Promise<void> => {
+    const response = await apiClient.post(
+      `/api/tenders/${tenderId}/reports/generate`,
+      {},
+      { responseType: "blob" }
+    );
+    const blob = new Blob([response.data as BlobPart], { type: "application/pdf" });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement("a");
+    a.href     = url;
+    const cd   = (response.headers?.["content-disposition"] as string) ?? "";
+    const m    = cd.match(/filename="([^"]+)"/);
+    a.download  = m?.[1] ?? `TenderGraph_Report_${tenderId}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { URL.revokeObjectURL(url); document.body.removeChild(a); }, 1000);
   },
 
-  downloadUrl: (tenderId: string, reportId: string): string => {
-    const base = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-    return `${base}/api/tenders/${tenderId}/reports/${reportId}/download`;
+  downloadById: async (tenderId: string, reportId: string): Promise<void> => {
+    const response = await apiClient.get(
+      `/api/tenders/${tenderId}/reports/${reportId}/download`,
+      { responseType: "blob" }
+    );
+    const blob = new Blob([response.data as BlobPart], { type: "application/pdf" });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement("a");
+    a.href     = url;
+    a.download = `TenderGraph_Report_${tenderId}.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { URL.revokeObjectURL(url); document.body.removeChild(a); }, 1000);
   },
 };
