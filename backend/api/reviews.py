@@ -9,6 +9,7 @@ from backend.api.auth import get_current_user, require_role
 from backend.database import get_db
 from backend.models.tables import (
     AuditEventType, Bidder, BidderDocument, BidderEvidence,
+    MandatoryStatus, OverallVerdict,
     ReviewTask, ReviewTaskStatus, Tender, User, UserRole, VerdictValue
 )
 from backend.services import audit_service
@@ -65,6 +66,29 @@ def _enrich_task(task: ReviewTask, db: Session) -> ReviewTaskOut:
             ).first()
             if doc:
                 out.evidence_source_doc_name = doc.original_filename or doc.filename
+
+        # Build human-readable escalation reason from evidence context
+        notes = (ev.extraction_notes or "").strip()
+        conf = ev.extraction_confidence or 0.0
+        crit_desc = (task.verdict.criterion.description[:120] if task.verdict.criterion else "this criterion")
+        raw_reason = task.reason_for_review or ""
+
+        if notes and len(notes) > 15 and not notes.lower().startswith("no evidence"):
+            # extraction_notes contains real document context — use it directly
+            conf_label = f" (extraction confidence: {conf:.0%})" if conf > 0 else ""
+            out.reason_for_review = f"{notes}{conf_label}"
+        elif raw_reason.startswith("Confidence gate:"):
+            # Replace system jargon with plain English
+            out.reason_for_review = (
+                f"The submitted evidence could not be automatically verified for: \"{crit_desc}\". "
+                f"The AI extracted text from the document but confidence was too low ({conf:.0%}) "
+                f"to make an automatic eligibility decision. Please review the evidence below and "
+                f"mark as Eligible or Not Eligible."
+            )
+        elif notes:
+            out.reason_for_review = notes
+        # else keep original reason_for_review as-is
+
     return out
 
 
@@ -145,6 +169,37 @@ def resolve_task(
         task.verdict.override_officer_id = current_user.user_id
         task.verdict.override_at = datetime.utcnow()
         task.verdict.human_reviewed = True
+
+    db.flush()
+
+    # Recalculate bidder's overall verdict based on all updated criterion verdicts
+    if task.bidder:
+        bidder_obj = task.bidder
+        tender_obj = bidder_obj.tender
+        approved_criteria = [c for c in tender_obj.criteria if c.is_approved]
+        verdicts_by_crit = {v.criterion_id: v for v in bidder_obj.verdicts}
+
+        mandatory_not_eligible = False
+        any_mandatory_review = False
+
+        for c in approved_criteria:
+            cv = verdicts_by_crit.get(c.criterion_id)
+            if cv is None:
+                continue
+            eff = cv.override_verdict or cv.verdict
+            if c.mandatory_status == MandatoryStatus.MANDATORY:
+                if eff == VerdictValue.NOT_ELIGIBLE:
+                    mandatory_not_eligible = True
+                    break
+                elif eff == VerdictValue.NEEDS_MANUAL_REVIEW:
+                    any_mandatory_review = True
+
+        if mandatory_not_eligible:
+            bidder_obj.overall_verdict = OverallVerdict.NOT_ELIGIBLE
+        elif any_mandatory_review:
+            bidder_obj.overall_verdict = OverallVerdict.NEEDS_MANUAL_REVIEW
+        else:
+            bidder_obj.overall_verdict = OverallVerdict.ELIGIBLE
 
     db.commit()
 

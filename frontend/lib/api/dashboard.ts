@@ -11,7 +11,20 @@ export interface DashboardStats {
   evaluation_complete_tenders: number;
 }
 
+export interface BidderDashboardStats {
+  registered_tenders: number;
+  evaluations_complete: number;
+  eligible: number;
+  not_eligible: number;
+  needs_review: number;
+  pending: number;
+  total_documents: number;
+}
+
 export const dashboardApi = {
   getStats: (): Promise<DashboardStats> =>
-    api.get("/dashboard/stats").then((r) => r.data),
+    api.get("/api/dashboard/stats").then((r) => r.data),
+
+  getBidderStats: (): Promise<BidderDashboardStats> =>
+    api.get("/api/dashboard/bidder-stats").then((r) => r.data),
 };

@@ -83,6 +83,8 @@ def process_bidder_document(self, doc_id: str):
                 "page_count": result["page_count"],
                 "chunk_count": len(all_chunks),
                 "avg_confidence": result["avg_confidence"],
+                "low_quality_pages": result.get("low_quality_pages", []),
+                "preprocessing_applied": len(result.get("low_quality_pages", [])) > 0,
             },
             bidder_id=doc.bidder_id,
         )

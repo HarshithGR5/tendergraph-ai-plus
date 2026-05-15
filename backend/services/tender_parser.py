@@ -137,7 +137,18 @@ def process_tender(tender_id: str, db: Session) -> bool:
             tender_id=tender_id,
         )
 
-        full_text = extraction["full_text"]
+        # Build page-annotated text so the LLM can report correct source_page values
+        pages = extraction.get("pages", [])
+        if pages:
+            annotated_parts = []
+            for pg in pages:
+                pg_text = (pg.get("text") or "").strip()
+                if pg_text:
+                    annotated_parts.append(f"=== PAGE {pg['page']} ===\n{pg_text}")
+            full_text = "\n\n".join(annotated_parts) if annotated_parts else extraction["full_text"]
+        else:
+            full_text = extraction["full_text"]
+
         if not full_text.strip():
             logger.error(f"No text extracted from tender {tender_id}")
             tender.status = TenderStatus.UPLOADING

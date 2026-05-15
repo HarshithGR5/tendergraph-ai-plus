@@ -15,7 +15,7 @@ For each criterion found, extract a structured JSON object. Be thorough — crit
    - "if applicable", "where relevant" → CONDITIONAL
 4. For threshold-based criteria (turnover, project count, contract value), extract the exact numeric threshold and unit.
 5. Note which document the bidder must submit as evidence.
-6. Include the source clause number and page number where possible.
+6. The document text is annotated with page markers in the format "=== PAGE X ===" before each page's content. Use these markers to set the correct integer value for "source_page". Do NOT leave source_page as null — always provide the page number where the criterion appears.
 7. Flag any ambiguity in the criterion language.
 
 ## OUTPUT FORMAT:

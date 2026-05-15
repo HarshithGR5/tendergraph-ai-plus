@@ -24,7 +24,7 @@ Required env vars:
 - **DB**: PostgreSQL (Replit managed)
 - **Auth**: JWT (python-jose) + bcrypt==4.0.1 (pinned — must stay at 4.0.1 or login collapses)
 - **LLM/OCR**: GPT-4o (OpenAI) via structured JSON output mode
-- **PDF parsing**: PyMuPDF + pdfplumber (native), GPT-4o Vision (scanned)
+- **PDF parsing**: PyMuPDF + pdfplumber (native), OpenCV preprocessing + Tesseract quality gate + GPT-4o Vision (scanned)
 - **Reports**: ReportLab PDF generation
 - **Frontend**: Next.js 15 + React 19 + TypeScript + Tailwind CSS v4
 - **State**: Zustand + React Query
@@ -70,6 +70,7 @@ frontend/
 
 - **AI extraction ≠ final verdict**: GPT-4o extracts structured evidence; a deterministic Python rule engine makes all eligibility decisions. This separation ensures reproducibility and legal defensibility.
 - **Confidence gating**: Any extraction with confidence < 0.60 is escalated to `NEEDS_MANUAL_REVIEW` — no bidder is silently disqualified.
+- **Defense-in-depth OCR**: Scanned pages go through: (1) render at 300 DPI, (2) Tesseract quality check — if confidence < 0.30 triggers aggressive mode, (3) OpenCV pipeline: deskew → CLAHE contrast → adaptive binarization (+ morphological denoising + sharpening in aggressive mode), (4) GPT-4o Vision on preprocessed image with blended confidence score (70% GPT-4o + 30% Tesseract). Low-quality pages are recorded in the audit trail.
 - **Immutable audit trail**: `audit_events` table is append-only with SHA-256 hash chaining across every row. Tamper-evident.
 - **Local storage first**: All uploaded documents stored to `./backend/storage/` filesystem. No cloud object storage dependency.
 - **bcrypt pinned at 4.0.1**: passlib[bcrypt] with bcrypt==4.0.1 is required for login to work. Do not upgrade bcrypt.
@@ -102,7 +103,8 @@ Five evaluation workflow views (authenticated):
 
 - **bcrypt must be 4.0.1** — passlib is incompatible with bcrypt 5.x, login collapses silently.
 - The `DATABASE_URL` from Replit already contains `?ssl` — no extra connect_args needed.
-- OCR for scanned PDFs uses GPT-4o Vision — costs API credits per page.
+- OCR for scanned PDFs uses OpenCV preprocessing + GPT-4o Vision — costs API credits per page. Low-quality scans run through aggressive preprocessing first (deskew, CLAHE, binarization, morphological denoising).
+- `low_quality_pages` list in OCR result (and audit trail) identifies which pages had degraded scans and what preprocessing was applied.
 - Alembic ini file is at `backend/alembic.ini`, not the project root.
 - Criterion verdicts have a unique constraint on `(bidder_id, criterion_id)` — re-running evaluation updates existing records.
 

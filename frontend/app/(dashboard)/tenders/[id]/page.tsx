@@ -489,26 +489,30 @@ export default function TenderDetailPage({ params }: { params: Promise<{ id: str
   const canApproveCriteria = user?.role === "SENIOR_OFFICER" || user?.role === "SYSTEM_ADMIN";
   const canTriggerEvaluation = user?.role === "PROCUREMENT_OFFICER" || user?.role === "SENIOR_OFFICER" || user?.role === "SYSTEM_ADMIN";
 
-  // Bidder gets their own dedicated view
-  if (isBidder) return <BidderTenderView tenderId={id} />;
-
+  // All hooks must be called unconditionally before any early return
   const { data: tender, isLoading: tenderLoading } = useQuery({
     queryKey: ["tender", id],
     queryFn: () => tendersApi.get(id),
     refetchInterval: 8_000,
+    enabled: !isBidder,
   });
 
   const { data: criteria = [], isLoading: criteriaLoading } = useQuery({
     queryKey: ["criteria", id],
     queryFn: () => tendersApi.getCriteria(id),
     refetchInterval: 8_000,
+    enabled: !isBidder,
   });
 
   const { data: bidders = [], isLoading: biddersLoading } = useQuery({
     queryKey: ["bidders", id],
     queryFn: () => biddersApi.list(id),
     refetchInterval: 8_000,
+    enabled: !isBidder,
   });
+
+  // Bidder gets their own dedicated view — after all hooks
+  if (isBidder) return <BidderTenderView tenderId={id} />;
 
   function updateCriterion(updated: TenderCriterion) {
     queryClient.setQueryData<TenderCriterion[]>(["criteria", id], (old) =>

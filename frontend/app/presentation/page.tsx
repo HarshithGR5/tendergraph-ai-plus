@@ -185,7 +185,7 @@ const slides: React.FC[] = [
       <div className="flex items-center gap-2 justify-between">
         {[
           { label: "Tender Upload", sub: "PDF · DOCX · Image", color: "bg-blue-600" },
-          { label: "OCR Pipeline", sub: "PyMuPDF + GPT-4o Vision", color: "bg-blue-500" },
+          { label: "OCR Pipeline", sub: "OpenCV + Tesseract + GPT-4o", color: "bg-blue-500" },
           { label: "Criteria Extraction", sub: "GPT-4o structured JSON", color: "bg-cyan-600" },
           { label: "Evidence Extraction", sub: "Per criterion, per bidder", color: "bg-cyan-500" },
           { label: "Rule Engine", sub: "Deterministic Python", color: "bg-purple-600" },
@@ -223,8 +223,8 @@ const slides: React.FC[] = [
           {[
             { type: "Native PDF", tool: "PyMuPDF + pdfplumber", detail: "Text extraction with layout preservation, table detection, bounding box coordinates." },
             { type: "DOCX / Word", tool: "python-docx", detail: "Structured paragraph and table extraction with section hierarchy." },
-            { type: "Scanned PDF / Image", tool: "GPT-4o Vision", detail: "Page rendered as image, sent to GPT-4o with structured OCR prompt. Returns text + confidence." },
-            { type: "Handwritten / Stamps", tool: "GPT-4o Vision + human flag", detail: "Low-confidence output triggers NEEDS_MANUAL_REVIEW automatically." },
+            { type: "Scanned PDF / Image", tool: "OpenCV + Tesseract + GPT-4o Vision", detail: "300 DPI render → Tesseract quality check → OpenCV deskew/CLAHE/binarize → GPT-4o Vision on preprocessed image. Blended confidence (70% GPT-4o + 30% Tesseract)." },
+            { type: "Low-quality / Stamps", tool: "Aggressive preprocessing + human flag", detail: "Tesseract confidence < 0.30 triggers aggressive mode: morphological denoising + sharpening. Low-quality pages logged to audit trail." },
           ].map((d) => (
             <Card key={d.type} className="flex items-start gap-3">
               <div className="w-2 h-2 rounded-full bg-cyan-400 mt-1.5 flex-shrink-0" />
@@ -240,9 +240,9 @@ const slides: React.FC[] = [
             <div className="text-slate-400 text-xs mb-4 font-semibold uppercase tracking-wider">Output per document chunk</div>
             {[
               { label: "extracted_text", val: "Raw OCR text" },
-              { label: "ocr_confidence", val: "0.0 – 1.0" },
+              { label: "ocr_confidence", val: "0.0–1.0 (blended)" },
               { label: "source_page", val: "Integer" },
-              { label: "bounding_box", val: "x, y, w, h" },
+              { label: "low_quality_pages", val: "Array of flagged pages" },
             ].map((r) => (
               <div key={r.label} className="flex justify-between py-2 border-b border-white/5 text-sm">
                 <code className="text-cyan-300 text-xs">{r.label}</code>
@@ -487,53 +487,37 @@ const slides: React.FC[] = [
   () => (
     <div className="flex flex-col justify-center h-full px-20">
       <div className="mb-3"><Tag color="blue">Frontend Dashboard</Tag></div>
-      <h2 className="text-4xl font-black text-white mb-8">Five purpose-built evaluation views.</h2>
-      <div className="grid grid-cols-5 gap-3">
-        {[
-          {
-            n: "01", title: "Tender Overview",
-            desc: "Upload tender document. AI extracts criteria. Officer reviews and approves schema before evaluation begins.",
-            color: "bg-blue-600",
-          },
-          {
-            n: "02", title: "Bidder Matrix",
-            desc: "Colour-coded verdict grid: all bidders × all criteria. Instant overview of who passes, who fails, who needs review.",
-            color: "bg-purple-600",
-          },
-          {
-            n: "03", title: "Bidder Report",
-            desc: "Per-bidder deep-dive: criterion verdict, extracted evidence, source document, page, clause, confidence score.",
-            color: "bg-cyan-600",
-          },
-          {
-            n: "04", title: "Review Queue",
-            desc: "Kanban board for NEEDS_MANUAL_REVIEW cases. Assign, review evidence, override with logged justification.",
-            color: "bg-amber-600",
-          },
-          {
-            n: "05", title: "Audit Trail",
-            desc: "Chronological immutable event log with SHA-256 chain verification on demand. Exportable for CVC.",
-            color: "bg-emerald-600",
-          },
-        ].map((v) => (
-          <div key={v.n} className="bg-white/5 border border-white/10 rounded-2xl p-4 flex flex-col">
-            <div className={`${v.color} w-8 h-8 rounded-lg flex items-center justify-center text-white text-xs font-black mb-3`}>{v.n}</div>
-            <div className="text-white font-bold text-sm mb-2">{v.title}</div>
-            <div className="text-slate-400 text-xs leading-relaxed flex-1">{v.desc}</div>
+      <h2 className="text-4xl font-black text-white mb-6">Role-aware dashboards + five evaluation views.</h2>
+      <div className="grid grid-cols-2 gap-4 mb-4">
+        <div className="border border-teal-500/30 bg-teal-500/5 rounded-2xl p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <div className="bg-teal-600 w-7 h-7 rounded-lg flex items-center justify-center text-white text-xs font-black">B</div>
+            <span className="text-white font-bold text-sm">Bidder Dashboard</span>
+            <span className="text-teal-400 text-[10px] font-semibold ml-auto">BIDDER role only</span>
           </div>
-        ))}
+          <div className="text-slate-400 text-xs leading-relaxed">Personal stats: registered tenders, evaluations complete, eligible verdicts, document count. Verdict distribution chart + submission history. No system-wide data visible.</div>
+        </div>
+        <div className="border border-blue-500/30 bg-blue-500/5 rounded-2xl p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <div className="bg-blue-600 w-7 h-7 rounded-lg flex items-center justify-center text-white text-xs font-black">P</div>
+            <span className="text-white font-bold text-sm">Procurement Dashboard</span>
+            <span className="text-blue-400 text-[10px] font-semibold ml-auto">Officers + Admin</span>
+          </div>
+          <div className="text-slate-400 text-xs leading-relaxed">System-wide metrics: total tenders, criteria, AI processing, complete evaluations. Tender pipeline status chart + verdict distribution (horizontal bars). Bidder summary row + recent tender activity.</div>
+        </div>
       </div>
-      <div className="mt-6 grid grid-cols-5 gap-3">
+      <div className="grid grid-cols-5 gap-2">
         {[
-          { role: "BIDDER", views: "Tender list + own docs" },
-          { role: "PROCUREMENT_OFFICER", views: "1 · 2 · 3 · 4" },
-          { role: "SENIOR_OFFICER", views: "1 · 2 · 3 · 4 (upload + approve)" },
-          { role: "SYSTEM_ADMIN", views: "1–5 + Settings" },
-          { role: "AUDIT_REVIEWER", views: "5 only (read-only)" },
-        ].map((r) => (
-          <div key={r.role} className="bg-white/3 border border-white/5 rounded-xl p-3 text-center">
-            <div className="text-slate-400 text-[10px] font-semibold">{r.role}</div>
-            <div className="text-white text-xs font-bold mt-1">{r.views}</div>
+          { n: "01", title: "Tender Overview", desc: "Upload · extract criteria · officer approves schema", color: "bg-blue-600" },
+          { n: "02", title: "Bidder Matrix", desc: "Colour-coded grid: all bidders × all criteria", color: "bg-purple-600" },
+          { n: "03", title: "Bidder Report", desc: "Per-bidder evidence chain with source + clause + confidence", color: "bg-cyan-600" },
+          { n: "04", title: "Review Queue", desc: "Kanban for NEEDS_MANUAL_REVIEW · override logged", color: "bg-amber-600" },
+          { n: "05", title: "Audit Trail", desc: "SHA-256 hash-chain · CVC-exportable event log", color: "bg-emerald-600" },
+        ].map((v) => (
+          <div key={v.n} className="bg-white/5 border border-white/10 rounded-xl p-3 flex flex-col">
+            <div className={`${v.color} w-7 h-7 rounded-lg flex items-center justify-center text-white text-xs font-black mb-2`}>{v.n}</div>
+            <div className="text-white font-bold text-xs mb-1">{v.title}</div>
+            <div className="text-slate-400 text-[10px] leading-relaxed flex-1">{v.desc}</div>
           </div>
         ))}
       </div>
@@ -568,9 +552,9 @@ const slides: React.FC[] = [
           {
             layer: "AI / OCR", color: "border-cyan-500/30",
             items: [
-              { name: "GPT-4o (OpenAI)", why: "Structured JSON output, Vision API" },
-              { name: "PyMuPDF + pdfplumber", why: "Native PDF parsing with layout" },
-              { name: "pytesseract", why: "Fallback OCR for image documents" },
+              { name: "GPT-4o (OpenAI)", why: "Structured JSON output, Vision API for scanned docs" },
+              { name: "OpenCV + pytesseract", why: "Defense-in-depth preprocessing: deskew, CLAHE, binarize, quality gate" },
+              { name: "PyMuPDF + pdfplumber", why: "Native PDF parsing with layout, bounding boxes" },
               { name: "ReportLab", why: "Programmatic PDF report generation" },
             ],
           },
@@ -846,8 +830,8 @@ const slides: React.FC[] = [
             items: [
               "Multilingual support — Hindi, regional languages via GPT-4o multilingual",
               "GeM / eProcurement API integration — direct document import",
-              "Bidder self-service portal — document upload + status tracking",
               "Email/SMS notifications for review assignments",
+              "Bulk tender import from NIC / e-procurement portals",
             ],
           },
           {

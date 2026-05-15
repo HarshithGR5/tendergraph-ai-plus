@@ -169,7 +169,7 @@ def _generate_pdf(tender: Tender) -> bytes:
                  _p("Category", label_s), _p("Mandatory?", label_s)]]
     for i, c in enumerate(disp_criteria):
         cat = c.category.value if hasattr(c.category, "value") else str(c.category)
-        mnd = "Yes" if str(getattr(c, "mandatory_status", "")) == "MANDATORY" else "No"
+        mnd = "Yes" if getattr(c.mandatory_status, "value", str(c.mandatory_status)) == "MANDATORY" else "No"
         desc = c.description[:110] + ("…" if len(c.description) > 110 else "")
         leg_rows.append([_p(f"C{i+1}", mono_s), _p(desc, cell_s), _p(cat, cell_s), _p(mnd, cell_s)])
 
