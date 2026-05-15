@@ -168,7 +168,7 @@ const ROLES = [
     ],
   },
   {
-    role: "Senior Officer",
+    role: "Senior Procurement Officer",
     badge: "SENIOR_OFFICER",
     color: "purple",
     icon: ClipboardCheck,
@@ -185,7 +185,7 @@ const ROLES = [
     color: "rose",
     icon: Activity,
     permissions: [
-      "All Senior Officer permissions",
+      "All Senior Procurement Officer permissions",
       "Create and manage user accounts",
       "Configure confidence thresholds system-wide",
       "Export tamper-evident audit chain data",

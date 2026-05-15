@@ -7,7 +7,7 @@ import {
   ChevronRight, FileText, CheckSquare, BarChart2, MessageSquare,
   Shield, Download, RefreshCw, CheckCircle, Plus, Upload,
   Loader2, Building2, X, AlertTriangle, Trash2, Lock, CheckCheck,
-  Play
+  Play, ChevronDown, ChevronUp, XCircle
 } from "lucide-react";
 import { tendersApi } from "@/lib/api/tenders";
 import { biddersApi } from "@/lib/api/bidders";
@@ -19,7 +19,7 @@ import { ConfirmModal } from "@/components/ui/modal";
 import { formatDate, formatCurrency, cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { useAuthStore } from "@/lib/stores/authStore";
-import type { TenderCriterion, Bidder, BidderDocument } from "@/lib/types";
+import type { TenderCriterion, Bidder, BidderDocument, BidderVerdictDetail } from "@/lib/types";
 
 // ─── Bidder Portal: tender-specific view ──────────────────────────────────────
 function BidderTenderView({ tenderId }: { tenderId: string }) {
@@ -33,7 +33,17 @@ function BidderTenderView({ tenderId }: { tenderId: string }) {
   const [docCategory, setDocCategory] = useState("");
   const [confirmingSubmission, setConfirmingSubmission] = useState(false);
   const [showLockModal, setShowLockModal] = useState(false);
+  const [expandedCriteria, setExpandedCriteria] = useState<Set<string>>(new Set());
   const fileRef = useRef<HTMLInputElement>(null);
+
+  function toggleCriterion(id: string) {
+    setExpandedCriteria((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
 
   const { data: tender } = useQuery({
     queryKey: ["tender", tenderId],
@@ -52,6 +62,20 @@ function BidderTenderView({ tenderId }: { tenderId: string }) {
     enabled: !!registration?.bidder_id,
     refetchInterval: 10_000,
   });
+
+  const showVerdictDetail = registration?.processing_complete &&
+    (registration.overall_verdict === "NOT_ELIGIBLE" || registration.overall_verdict === "NEEDS_MANUAL_REVIEW");
+
+  const { data: verdictDetails = [] } = useQuery<BidderVerdictDetail[]>({
+    queryKey: ["my-verdicts", registration?.bidder_id],
+    queryFn: () => biddersApi.getMyVerdicts(registration!.bidder_id),
+    enabled: !!registration?.bidder_id && !!showVerdictDetail,
+  });
+
+  // Only show criteria where the bidder failed or needs review — eligibles are not shown
+  const failedCriteria = verdictDetails.filter((v) =>
+    v.effective_verdict === "NOT_ELIGIBLE" || v.effective_verdict === "NEEDS_MANUAL_REVIEW"
+  );
 
   const isNotRegistered = (regError as any)?.response?.status === 404;
 
@@ -195,6 +219,77 @@ function BidderTenderView({ tenderId }: { tenderId: string }) {
               <VerdictBadge verdict={registration.overall_verdict} />
             </div>
           </div>
+
+          {/* Verdict breakdown — only shown when NOT_ELIGIBLE / NEEDS_MANUAL_REVIEW and failed criteria exist */}
+          {showVerdictDetail && failedCriteria.length > 0 && (
+            <div className="bg-white border border-red-200 rounded-xl overflow-hidden">
+              <div className="px-5 py-3 border-b border-red-100 bg-red-50/60 flex items-center gap-2">
+                <XCircle className="w-4 h-4 text-red-500 flex-shrink-0" />
+                <div>
+                  <h3 className="text-sm font-semibold text-red-800">
+                    {registration?.overall_verdict === "NOT_ELIGIBLE" ? "Reasons for Ineligibility" : "Criteria Requiring Review"}
+                  </h3>
+                  <p className="text-xs text-red-500 mt-0.5">
+                    {failedCriteria.length} criterion{failedCriteria.length !== 1 ? "a" : ""} did not pass — click any row to see the full explanation.
+                  </p>
+                </div>
+              </div>
+              <div className="divide-y divide-slate-100">
+                {failedCriteria.map((v) => {
+                  const eff = v.effective_verdict;
+                  const isExpanded = expandedCriteria.has(v.criterion_id);
+                  const borderColor = eff === "NOT_ELIGIBLE" ? "border-l-red-400" : "border-l-amber-400";
+                  const label = eff === "NOT_ELIGIBLE" ? "Not Eligible" : "Under Review";
+                  const labelColor = eff === "NOT_ELIGIBLE" ? "text-red-700 bg-red-100" : "text-amber-700 bg-amber-100";
+                  return (
+                    <div key={v.criterion_id} className={cn("border-l-4", borderColor)}>
+                      <button
+                        onClick={() => toggleCriterion(v.criterion_id)}
+                        className="w-full px-5 py-3.5 flex items-center justify-between gap-4 hover:bg-slate-50 transition-colors text-left"
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          {eff === "NOT_ELIGIBLE"
+                            ? <XCircle className="w-4 h-4 text-red-500 flex-shrink-0" />
+                            : <AlertTriangle className="w-4 h-4 text-amber-500 flex-shrink-0" />}
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              {v.criterion_category && (
+                                <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">{v.criterion_category}</span>
+                              )}
+                              <span className={cn("text-[10px] font-bold px-2 py-0.5 rounded-full", labelColor)}>{label}</span>
+                            </div>
+                            <p className="text-sm font-medium text-slate-800 mt-0.5 truncate">{v.criterion_description ?? "Unnamed criterion"}</p>
+                          </div>
+                        </div>
+                        {isExpanded
+                          ? <ChevronUp className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                          : <ChevronDown className="w-4 h-4 text-slate-400 flex-shrink-0" />}
+                      </button>
+                      {isExpanded && (
+                        <motion.div
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: "auto" }}
+                          exit={{ opacity: 0, height: 0 }}
+                          className="px-5 pb-4"
+                        >
+                          <div className={cn("rounded-lg p-3.5 text-xs leading-relaxed border",
+                            eff === "NOT_ELIGIBLE" ? "bg-red-50 border-red-100 text-red-800" : "bg-amber-50 border-amber-100 text-amber-800"
+                          )}>
+                            {v.reason}
+                          </div>
+                          {v.confidence !== null && v.confidence !== undefined && (
+                            <p className="text-[10px] text-slate-400 mt-1.5 pl-1">
+                              Extraction confidence: {(v.confidence * 100).toFixed(0)}%
+                            </p>
+                          )}
+                        </motion.div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* Upload area — hidden when submission confirmed */}
           {!registration.submission_confirmed && (

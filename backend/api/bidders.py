@@ -641,6 +641,51 @@ def delete_document(
         pass
 
 
+# ── Run KYC and persist result: officer-triggered ─────────────────────────────
+@router.post("/{bidder_id}/run-kyc", response_model=dict)
+def run_kyc_for_bidder_endpoint(
+    tender_id: str,
+    bidder_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role(
+        UserRole.PROCUREMENT_OFFICER, UserRole.SENIOR_OFFICER, UserRole.SYSTEM_ADMIN
+    )),
+):
+    """Run KYC checks for a bidder and persist the result to the database."""
+    bidder = db.query(Bidder).filter(Bidder.bidder_id == bidder_id, Bidder.tender_id == tender_id).first()
+    if not bidder:
+        raise HTTPException(status_code=404, detail="Bidder not found.")
+    try:
+        from backend.services.kyc_service import run_full_kyc
+        result = run_full_kyc(
+            company_name=bidder.company_name,
+            gstin=bidder.gstin,
+            pan=bidder.pan,
+            sandbox=True,
+        )
+        status = result.get("overall_kyc_status", "REVIEW")
+        bidder.kyc_status = status
+        bidder.kyc_run_at = datetime.utcnow()
+        db.commit()
+        audit_service.log_event(
+            db=db,
+            event_type=AuditEventType.KYC_COMPLETED,
+            actor_id=current_user.user_id,
+            actor_type="HUMAN",
+            payload={
+                "bidder_id": bidder_id,
+                "kyc_status": status,
+                "triggered_by": "officer_manual",
+                "issues": result.get("issues", []),
+            },
+            tender_id=tender_id,
+            bidder_id=bidder_id,
+        )
+        return {**result, "kyc_status_saved": True}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"KYC check failed: {str(e)}")
+
+
 # ── Evidence list: internal staff only ────────────────────────────────────────
 @router.get("/{bidder_id}/evidence", response_model=List[EvidenceOut])
 def get_evidence(

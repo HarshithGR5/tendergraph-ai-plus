@@ -128,7 +128,7 @@
                 { "key": "view_password", "value": "", "type": "text", "description": "Optional access password for officers" }
               ]
             },
-            "description": "Senior Officer / System Admin only. Triggers async AI criterion extraction."
+            "description": "Senior Procurement Officer / System Admin only. Triggers async AI criterion extraction."
           }
         },
         {
@@ -326,7 +326,7 @@
               "mode": "raw",
               "raw": "{\n  \"override_verdict\": \"ELIGIBLE\",\n  \"override_reason\": \"Upon manual review, the submitted CA certificate clearly satisfies the turnover requirement.\"\n}"
             },
-            "description": "Senior Officer / System Admin only. Overrides an AI verdict. Logged immutably to audit trail."
+            "description": "Senior Procurement Officer / System Admin only. Overrides an AI verdict. Logged immutably to audit trail."
           }
         }
       ]
@@ -347,7 +347,7 @@
           "request": {
             "method": "GET",
             "url": "{{base_url}}/api/reviews/",
-            "description": "Cross-tender review queue. Senior Officer+ only."
+            "description": "Cross-tender review queue. Senior Procurement Officer+ only."
           }
         },
         {
@@ -360,7 +360,7 @@
               "mode": "raw",
               "raw": "{\n  \"resolution_verdict\": \"ELIGIBLE\",\n  \"resolution_notes\": \"Reviewed original documents. All criteria satisfied. Overriding to ELIGIBLE.\"\n}"
             },
-            "description": "Senior Officer only. Resolves a manual review task and updates the criterion verdict."
+            "description": "Senior Procurement Officer only. Resolves a manual review task and updates the criterion verdict."
           }
         }
       ]

@@ -1,5 +1,5 @@
 import apiClient from "./client";
-import type { Bidder, BidderSubmission, BidderDocument, BidderEvidence } from "@/lib/types";
+import type { Bidder, BidderSubmission, BidderDocument, BidderEvidence, BidderVerdictDetail, KYCResult } from "@/lib/types";
 
 export const biddersApi = {
   list: async (tenderId: string): Promise<Bidder[]> => {
@@ -96,5 +96,15 @@ export const biddersApi = {
 
   deleteDocument: async (tenderId: string, bidderId: string, docId: string): Promise<void> => {
     await apiClient.delete(`/api/tenders/${tenderId}/bidders/${bidderId}/documents/${docId}`);
+  },
+
+  runKyc: async (tenderId: string, bidderId: string): Promise<KYCResult & { kyc_status_saved: boolean }> => {
+    const { data } = await apiClient.post(`/api/tenders/${tenderId}/bidders/${bidderId}/run-kyc`);
+    return data;
+  },
+
+  getMyVerdicts: async (bidderId: string): Promise<BidderVerdictDetail[]> => {
+    const { data } = await apiClient.get<BidderVerdictDetail[]>(`/api/bidder/my-submissions/${bidderId}/verdicts`);
+    return data;
   },
 };

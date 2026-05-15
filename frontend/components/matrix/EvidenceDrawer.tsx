@@ -9,7 +9,7 @@ import {
 import { VerdictBadge, CategoryBadge } from "@/components/ui/badge";
 import { ConfidenceMeter } from "@/components/ui/confidence-meter";
 import { formatDateTime, formatCurrency, cn, getRuleDisplayName } from "@/lib/utils";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { biddersApi } from "@/lib/api/bidders";
 import { kycApi } from "@/lib/api/kyc";
 import type { CriterionVerdict, TenderCriterion, Bidder, KYCResult } from "@/lib/types";
@@ -96,9 +96,12 @@ function KYCResultDetail({ kycResult, onRerun }: { kycResult: KYCResult; onRerun
 }
 
 export function EvidenceDrawer({ open, onClose, verdict, criterion, bidder, tenderId }: Props) {
+  const queryClient = useQueryClient();
   const [kycResult, setKycResult] = useState<KYCResult | null>(null);
   const [kycLoading, setKycLoading] = useState(false);
   const [kycRan, setKycRan] = useState(false);
+  // Track live kyc_status after a manual run (so it persists in the drawer)
+  const [liveKycStatus, setLiveKycStatus] = useState<"PASS" | "FAIL" | "REVIEW" | null>(null);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
@@ -111,6 +114,7 @@ export function EvidenceDrawer({ open, onClose, verdict, criterion, bidder, tend
     if (open) {
       setKycResult(null);
       setKycRan(false);
+      setLiveKycStatus(null);
     }
   }, [open, bidder?.bidder_id]);
 
@@ -124,7 +128,8 @@ export function EvidenceDrawer({ open, onClose, verdict, criterion, bidder, tend
   const effectiveVerdict = verdict?.override_verdict ?? verdict?.verdict;
 
   // If the bidder already has a KYC status from a previous check, treat it as "already run"
-  const existingKycStatus = bidder?.kyc_status as ("PASS" | "FAIL" | "REVIEW") | null | undefined;
+  // liveKycStatus takes priority (after manual run), then the prop value
+  const existingKycStatus = (liveKycStatus ?? bidder?.kyc_status) as ("PASS" | "FAIL" | "REVIEW") | null | undefined;
   const showExistingSummary = !!existingKycStatus && !kycRan;
 
   async function runKYC() {
@@ -132,14 +137,25 @@ export function EvidenceDrawer({ open, onClose, verdict, criterion, bidder, tend
     setKycLoading(true);
     setKycRan(true);
     try {
-      const result = await kycApi.fullCheck({
-        company_name: bidder.company_name,
-        gstin: bidder.gstin,
-        pan: bidder.pan,
-      });
+      // Use the persisting endpoint so result is saved to DB and reflected everywhere
+      const result = await biddersApi.runKyc(tenderId, bidder.bidder_id);
       setKycResult(result);
+      setLiveKycStatus(result.overall_kyc_status);
+      // Refresh matrix so the KYC badge updates
+      queryClient.invalidateQueries({ queryKey: ["matrix", tenderId] });
     } catch {
-      setKycResult(null);
+      // Fallback to non-persisting check if officer lacks write permissions
+      try {
+        const result = await kycApi.fullCheck({
+          company_name: bidder.company_name,
+          gstin: bidder.gstin,
+          pan: bidder.pan,
+        });
+        setKycResult(result);
+        setLiveKycStatus(result.overall_kyc_status);
+      } catch {
+        setKycResult(null);
+      }
     } finally {
       setKycLoading(false);
     }

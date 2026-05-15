@@ -50,6 +50,8 @@ logger = logging.getLogger(__name__)
 
 _SANDBOX_GSTIN_DB = {
     # Format: GSTIN → {status, legal_name, registration_date, state}
+
+    # ── Original entries ────────────────────────────────────────────────────────
     "27AABCU9603R1ZX": {
         "status": "Active",
         "legal_name": "Example Technology Pvt Ltd",
@@ -71,13 +73,75 @@ _SANDBOX_GSTIN_DB = {
         "state": "Delhi",
         "business_type": "Private Limited Company",
     },
+
+    # ── Demo companies ──────────────────────────────────────────────────────────
+    # KYC PASS — NeuralGov AI Pvt Ltd (Eligible bidder in demo)
+    "27AANCG7821K1ZP": {
+        "status": "Active",
+        "legal_name": "NeuralGov AI Pvt Ltd",
+        "registration_date": "2019-06-15",
+        "state": "Maharashtra",
+        "business_type": "Private Limited Company",
+    },
+    # KYC REVIEW — QuantumEdge Systems (Needs Review bidder in demo; suspended GSTIN triggers review)
+    "29AABCQ4412M1ZT": {
+        "status": "Suspended",
+        "legal_name": "QuantumEdge Systems Pvt Ltd",
+        "registration_date": "2020-03-01",
+        "state": "Karnataka",
+        "business_type": "Private Limited Company",
+    },
+    # KYC REVIEW — RapidByte Technologies (Not Eligible bidder in demo)
+    "29AACR5521D1ZU": {
+        "status": "Active",
+        "legal_name": "RapidByte Technologies Pvt Ltd",
+        "registration_date": "2021-01-10",
+        "state": "Karnataka",
+        "business_type": "Private Limited Company",
+    },
+    # Additional demo companies for variety
+    "07AABCI9845P1ZS": {
+        "status": "Active",
+        "legal_name": "InfraCore Solutions Ltd",
+        "registration_date": "2016-08-20",
+        "state": "Delhi",
+        "business_type": "Limited Company",
+    },
+    "09AADCF3391R1ZQ": {
+        "status": "Active",
+        "legal_name": "FutureTech Defence Systems Pvt Ltd",
+        "registration_date": "2017-11-05",
+        "state": "Uttar Pradesh",
+        "business_type": "Private Limited Company",
+    },
+    "24AABCG7723H1ZE": {
+        "status": "Suspended",
+        "legal_name": "GovBuild Infrastructure Ltd",
+        "registration_date": "2012-03-30",
+        "state": "Gujarat",
+        "business_type": "Limited Company",
+    },
 }
 
 _SANDBOX_PAN_DB = {
     # Format: PAN → {status, name, entity_type}
+
+    # ── Original entries ────────────────────────────────────────────────────────
     "AABCU9603R": {"status": "Active", "name": "Example Technology Pvt Ltd", "entity_type": "Company"},
     "AAACR5055K": {"status": "Active", "name": "Reliable Constructions Ltd", "entity_type": "Company"},
     "AAKCS9349N": {"status": "Active", "name": "Struck Off Ventures Pvt Ltd", "entity_type": "Company"},
+
+    # ── Demo companies ──────────────────────────────────────────────────────────
+    # KYC PASS — NeuralGov AI Pvt Ltd
+    "AANCG7821K": {"status": "Active", "name": "NeuralGov AI Pvt Ltd", "entity_type": "Company"},
+    # KYC REVIEW — QuantumEdge Systems (PAN active but company is flagged for review separately)
+    "AABCQ4412M": {"status": "Active", "name": "QuantumEdge Systems Pvt Ltd", "entity_type": "Company"},
+    # KYC REVIEW — RapidByte Technologies (PAN active, GSTIN active, but prior debarment inquiry)
+    "AACR5521D":  {"status": "Active", "name": "RapidByte Technologies Pvt Ltd", "entity_type": "Company"},
+    # Additional entries
+    "AABCI9845P": {"status": "Active", "name": "InfraCore Solutions Ltd", "entity_type": "Company"},
+    "AADCF3391R": {"status": "Active", "name": "FutureTech Defence Systems Pvt Ltd", "entity_type": "Company"},
+    "AABCG7723H": {"status": "Deactivated", "name": "GovBuild Infrastructure Ltd", "entity_type": "Company"},
 }
 
 # Debarment list — companies barred from government procurement by CVC / MoF order

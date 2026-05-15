@@ -399,7 +399,7 @@ const slides: React.FC[] = [
       <div className="grid grid-cols-3 gap-4 mb-6">
         {[
           { status: "OPEN", color: "border-amber-500/40 bg-amber-500/5", dot: "bg-amber-400", detail: "AI flagged case awaiting assignment. Displays: company name, criterion, reason for review, confidence score." },
-          { status: "IN PROGRESS", color: "border-blue-500/40 bg-blue-500/5", dot: "bg-blue-400", detail: "Assigned to a Senior Officer. Officer views extracted evidence, source document, page, clause reference." },
+          { status: "IN PROGRESS", color: "border-blue-500/40 bg-blue-500/5", dot: "bg-blue-400", detail: "Assigned to a Senior Procurement Officer. Officer views extracted evidence, source document, page, clause reference." },
           { status: "RESOLVED", color: "border-emerald-500/40 bg-emerald-500/5", dot: "bg-emerald-400", detail: "Override verdict logged with officer ID, timestamp, written justification. Audit event fires automatically." },
         ].map((col) => (
           <div key={col.status} className={`border rounded-2xl p-5 ${col.color}`}>

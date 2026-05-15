@@ -71,7 +71,7 @@ cd frontend && npm run dev -- --port 5000
 | `BIDDER` | Self-register to open tenders, upload documents (bulk or single), confirm & lock submission, track KYC and verdict |
 | `PROCUREMENT_OFFICER` | View tenders and bidder lists, trigger AI evaluation (single or bulk), manage review tasks |
 | `SENIOR_OFFICER` | Upload tenders, approve extracted criteria, add reviewer notes to criteria, override AI verdicts (all logged), sign reports |
-| `SYSTEM_ADMIN` | All Senior Officer permissions + user management, system config, full audit access |
+| `SYSTEM_ADMIN` | All Senior Procurement Officer permissions + user management, system config, full audit access |
 | `AUDIT_REVIEWER` | Read-only access to audit trail and SHA-256 hash-chain verification |
 
 ### Security Model

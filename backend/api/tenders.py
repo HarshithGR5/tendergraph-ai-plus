@@ -133,7 +133,7 @@ def _build_tender_out(t: Tender) -> TenderOut:
     return out
 
 
-# ── Tender upload: Senior Officer + Admin only ─────────────────────────────────
+# ── Tender upload: Senior Procurement Officer + Admin only ─────────────────────────────────
 @router.post("/", response_model=TenderOut, status_code=201)
 def upload_tender(
     background_tasks: BackgroundTasks,

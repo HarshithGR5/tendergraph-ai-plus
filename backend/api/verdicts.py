@@ -51,6 +51,9 @@ class BidderMatrixRow(BaseModel):
     company_name: str
     overall_verdict: OverallVerdict
     criteria_verdicts: List[VerdictOut]
+    kyc_status: Optional[str] = None
+    gstin: Optional[str] = None
+    pan: Optional[str] = None
 
 
 class OverridePayload(BaseModel):
@@ -104,11 +107,14 @@ def get_evaluation_matrix(
             company_name=bidder.company_name,
             overall_verdict=bidder.overall_verdict,
             criteria_verdicts=bidder.verdicts,
+            kyc_status=bidder.kyc_status,
+            gstin=bidder.gstin,
+            pan=bidder.pan,
         ))
     return rows
 
 
-# ── Override: Senior Officer + Admin only ─────────────────────────────────────
+# ── Override: Senior Procurement Officer + Admin only ─────────────────────────────────────
 @router.post("/bidders/{bidder_id}/verdicts/{verdict_id}/override", response_model=VerdictOut)
 def override_verdict(
     tender_id: str,

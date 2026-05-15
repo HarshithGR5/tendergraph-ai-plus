@@ -152,6 +152,19 @@ export interface BidderMatrixRow {
   company_name: string;
   overall_verdict: OverallVerdict;
   criteria_verdicts: CriterionVerdict[];
+  kyc_status: "PASS" | "FAIL" | "REVIEW" | null;
+  gstin: string | null;
+  pan: string | null;
+}
+
+export interface BidderVerdictDetail {
+  criterion_id: string;
+  criterion_description: string | null;
+  criterion_category: string | null;
+  verdict: VerdictValue;
+  effective_verdict: VerdictValue;
+  reason: string;
+  confidence: number | null;
 }
 
 export type ReviewTaskStatus = "OPEN" | "IN_PROGRESS" | "COMPLETED";

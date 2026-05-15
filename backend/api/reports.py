@@ -61,6 +61,23 @@ def _p(text: str, style) -> Paragraph:
     return Paragraph(safe, style)
 
 
+def _humanise_reason(reason: str) -> str:
+    """Convert technical rule-engine reason strings into plain human-readable text for reports."""
+    if not reason:
+        return reason
+    if reason.startswith("Confidence gate: extraction confidence"):
+        parts = reason.split(". ", 2)
+        human_prefix = "Manual review required — confidence too low for automatic determination."
+        original = parts[-1] if len(parts) > 1 else ""
+        return f"{human_prefix} {original}".strip()
+    if reason.startswith("Confidence gate: NOT_ELIGIBLE verdict"):
+        parts = reason.split(". ", 2)
+        human_prefix = "Manual review required — borderline confidence; automatic disqualification withheld."
+        original = parts[-1] if len(parts) > 1 else ""
+        return f"{human_prefix} {original}".strip()
+    return reason
+
+
 def _generate_pdf(tender: Tender) -> bytes:
     buffer = io.BytesIO()
     PAGE_W = A4[0] - 4 * cm
@@ -264,9 +281,15 @@ def _generate_pdf(tender: Tender) -> bytes:
             cat_str = c.category.value if hasattr(c.category, "value") else str(c.category)
             if v:
                 eff = (v.override_verdict or v.verdict).value
-                reason = v.reason[:200] + ("…" if len(v.reason) > 200 else "")
+                was_overridden = v.override_verdict is not None
+                raw_reason = v.override_reason if was_overridden else v.reason
+                clean_reason = _humanise_reason(raw_reason or v.reason)
+                if was_overridden:
+                    orig_verdict = v.verdict.value.replace("_", " ") if v.verdict else "unknown"
+                    clean_reason = f"[HUMAN OVERRIDE — original AI verdict: {orig_verdict}] {clean_reason}"
+                reason = clean_reason[:240] + ("…" if len(clean_reason) > 240 else "")
                 conf   = f"{v.confidence:.0%}" if v.confidence is not None else "—"
-                v_label = eff.replace("_", " ")
+                v_label = eff.replace("_", " ") + (" ✓OVR" if was_overridden else "")
                 ev = v.evidence
                 if ev:
                     doc_name = "—"

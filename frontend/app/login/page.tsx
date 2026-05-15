@@ -14,7 +14,7 @@ import { toast } from "sonner";
 const ROLE_CARDS = [
   { icon: Building2,     label: "Bidder",               color: "teal",   desc: "Self-register for tenders, upload documents, track outcomes" },
   { icon: FileText,      label: "Procurement Officer",  color: "blue",   desc: "View tenders, trigger evaluations, manage review tasks" },
-  { icon: ClipboardCheck,label: "Senior Officer",       color: "purple", desc: "Upload tenders, approve criteria, override verdicts" },
+  { icon: ClipboardCheck,label: "Senior Procurement Officer",       color: "purple", desc: "Upload tenders, approve criteria, override verdicts" },
   { icon: Activity,      label: "System Admin",         color: "rose",   desc: "Full access, user management, system configuration" },
   { icon: Eye,           label: "Audit Reviewer",       color: "amber",  desc: "Read-only access to audit trail and reports" },
 ];

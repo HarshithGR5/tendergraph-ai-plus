@@ -55,7 +55,7 @@ const SYSTEM_NAV: NavItem[] = [
 
 const ROLE_META: Record<UserRole, { label: string; color: string; icon: React.ElementType }> = {
   PROCUREMENT_OFFICER: { label: "Procurement Officer", color: "bg-blue-500",   icon: FileText        },
-  SENIOR_OFFICER:      { label: "Senior Officer",       color: "bg-purple-500", icon: ClipboardCheck  },
+  SENIOR_OFFICER:      { label: "Senior Procurement Officer",       color: "bg-purple-500", icon: ClipboardCheck  },
   SYSTEM_ADMIN:        { label: "System Admin",          color: "bg-rose-500",   icon: Activity        },
   AUDIT_REVIEWER:      { label: "Audit Reviewer",        color: "bg-amber-500",  icon: Eye             },
   BIDDER:              { label: "Bidder",                color: "bg-teal-500",   icon: Building2       },

@@ -144,7 +144,7 @@ def assign_task(
     return _enrich_task(task, db)
 
 
-# ── Resolve/override: Senior Officer + Admin ONLY ─────────────────────────────
+# ── Resolve/override: Senior Procurement Officer + Admin ONLY ─────────────────────────────
 @router.post("/{task_id}/resolve", response_model=ReviewTaskOut)
 def resolve_task(
     tender_id: str,

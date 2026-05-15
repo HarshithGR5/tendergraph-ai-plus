@@ -6,6 +6,7 @@ import { VerdictBadge, StatusBadge } from "@/components/ui/badge";
 import { formatDateTime, cn } from "@/lib/utils";
 import { reviewsApi } from "@/lib/api/reviews";
 import { useAuthStore } from "@/lib/stores/authStore";
+import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import type { ReviewTask, VerdictValue } from "@/lib/types";
 
@@ -13,6 +14,7 @@ interface Props { task: ReviewTask; tenderId: string; onUpdated: (t: ReviewTask)
 
 export function ReviewTaskCard({ task, tenderId, onUpdated }: Props) {
   const { user } = useAuthStore();
+  const queryClient = useQueryClient();
   const [resolving, setResolving] = useState(false);
   const [notes, setNotes] = useState("");
   const [showResolve, setShowResolve] = useState(false);
@@ -38,7 +40,9 @@ export function ReviewTaskCard({ task, tenderId, onUpdated }: Props) {
     try {
       const updated = await reviewsApi.resolve(tenderId, task.task_id, { resolution_verdict: verdict, resolution_notes: notes });
       onUpdated(updated);
-      toast.success("Review task resolved");
+      // Immediately refresh the matrix so overall verdict updates without waiting for the 15s poll
+      queryClient.invalidateQueries({ queryKey: ["matrix", tenderId] });
+      toast.success("Review task resolved — bidder matrix updated");
       setShowResolve(false);
     } catch { toast.error("Failed to resolve task"); }
     finally { setResolving(false); }
@@ -163,7 +167,7 @@ export function ReviewTaskCard({ task, tenderId, onUpdated }: Props) {
               </button>
             )}
             {task.status !== "OPEN" && !canResolve && (
-              <span className="text-[11px] text-slate-400 italic py-1.5">Senior Officer approval required to resolve</span>
+              <span className="text-[11px] text-slate-400 italic py-1.5">Senior Procurement Officer approval required to resolve</span>
             )}
           </div>
         )}

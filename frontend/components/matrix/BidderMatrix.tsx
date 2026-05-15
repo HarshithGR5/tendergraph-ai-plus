@@ -51,7 +51,21 @@ export function BidderMatrix({ matrix, criteria, tenderId }: Props) {
     const verdict = row.criteria_verdicts.find((v) => v.criterion_id === criterion.criterion_id) ?? null;
     setSelectedVerdict(verdict);
     setSelectedCriterion(criterion);
-    setSelectedBidder({ bidder_id: row.bidder_id, company_name: row.company_name, tender_id: tenderId } as Bidder);
+    setSelectedBidder({
+      bidder_id: row.bidder_id,
+      company_name: row.company_name,
+      tender_id: tenderId,
+      kyc_status: row.kyc_status,
+      gstin: row.gstin,
+      pan: row.pan,
+      overall_verdict: row.overall_verdict,
+      processing_complete: true,
+      submission_confirmed: true,
+      submission_timestamp: "",
+      document_count: 0,
+      email: null,
+      contact_name: null,
+    } as Bidder);
     setDrawerOpen(true);
   }
 

@@ -42,7 +42,7 @@ const ROLES: RoleOption[] = [
   },
   {
     value: "SENIOR_OFFICER",
-    label: "Senior Officer",
+    label: "Senior Procurement Officer",
     icon: ClipboardCheck,
     color: "border-purple-600 bg-purple-950/40",
     iconBg: "bg-purple-900/60",
