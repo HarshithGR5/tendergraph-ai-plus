@@ -73,8 +73,8 @@ function PayloadRenderer({ eventType, payload }: { eventType: AuditEventType; pa
               </span>
             )}
           </div>
-          {p.reason && <Row label="Reason" value={String(p.reason)} />}
-          {p.rule && <Row label="Rule" value={String(p.rule)} mono />}
+          {p.reason != null && <Row label="Reason" value={String(p.reason)} />}
+          {p.rule != null && <Row label="Rule" value={String(p.rule)} mono />}
           <Row label="Bidder" value={<ShortId id={String(p.bidder_id ?? "")} />} />
           <Row label="Criterion" value={<ShortId id={String(p.criterion_id ?? "")} />} />
         </div>
@@ -97,8 +97,11 @@ function PayloadRenderer({ eventType, payload }: { eventType: AuditEventType; pa
               </span>
             </div>
           )}
-          {(p.resolution_notes ?? p.override_reason) && (
-            <Row label="Notes" value={String(p.resolution_notes ?? p.override_reason)} />
+          {(p.resolution_notes != null || p.override_reason != null) && (
+            <Row
+              label="Notes"
+              value={String(p.resolution_notes ?? p.override_reason)}
+            />
           )}
         </div>
       );
@@ -107,8 +110,8 @@ function PayloadRenderer({ eventType, payload }: { eventType: AuditEventType; pa
     case "TENDER_UPLOADED": {
       return (
         <div className="space-y-1">
-          {p.title && <Row label="Title" value={String(p.title)} />}
-          {p.filename && <Row label="File" value={String(p.filename)} />}
+          {p.title != null && (<Row label="Title" value={String(p.title)} />)}
+          {p.filename != null && <Row label="File" value={String(p.filename)} />}
           <Row label="Tender ID" value={<ShortId id={String(p.tender_id ?? "")} />} />
         </div>
       );
@@ -121,7 +124,7 @@ function PayloadRenderer({ eventType, payload }: { eventType: AuditEventType; pa
             <AlertTriangle className="w-3 h-3 text-red-500" />
             <span className="text-[11px] text-red-600 font-semibold">Tender permanently deleted</span>
           </div>
-          {p.title && <Row label="Title" value={String(p.title)} />}
+          {p.title != null && <Row label="Title" value={String(p.title)} />}
           <Row label="Tender ID" value={<ShortId id={String(p.tender_id ?? "")} />} />
         </div>
       );
@@ -131,8 +134,8 @@ function PayloadRenderer({ eventType, payload }: { eventType: AuditEventType; pa
     case "BIDDER_REGISTERED": {
       return (
         <div className="space-y-1">
-          {p.company_name && <Row label="Company" value={String(p.company_name)} />}
-          {p.gstin && <Row label="GSTIN" value={String(p.gstin)} mono />}
+          {p.company_name != null && <Row label="Company" value={String(p.company_name)} />}
+          {p.gstin != null && <Row label="GSTIN" value={String(p.gstin)} mono />}
           <Row label="Bidder ID" value={<ShortId id={String(p.bidder_id ?? "")} />} />
         </div>
       );
@@ -165,7 +168,7 @@ function PayloadRenderer({ eventType, payload }: { eventType: AuditEventType; pa
       return (
         <div className="space-y-1">
           {p.count != null && <Row label="Criteria found" value={String(p.count)} />}
-          {p.category && <Row label="Category" value={String(p.category)} />}
+          {p.category != null && <Row label="Category" value={String(p.category)} />}
           <Row label="Tender" value={<ShortId id={String(p.tender_id ?? "")} />} />
         </div>
       );
@@ -187,7 +190,7 @@ function PayloadRenderer({ eventType, payload }: { eventType: AuditEventType; pa
       return (
         <div className="space-y-1">
           <Row label="Task ID" value={<ShortId id={String(p.task_id ?? "")} />} />
-          {p.assigned_to && <Row label="Assigned to" value={<ShortId id={String(p.assigned_to)} />} />}
+          {p.assigned_to != null && <Row label="Assigned to" value={<ShortId id={String(p.assigned_to)} />} />}
         </div>
       );
     }
@@ -221,8 +224,8 @@ function PayloadRenderer({ eventType, payload }: { eventType: AuditEventType; pa
     case "USER_LOGIN": {
       return (
         <div className="space-y-1">
-          {p.username && <Row label="Username" value={String(p.username)} />}
-          {p.role && <Row label="Role" value={String(p.role).replace(/_/g, " ")} />}
+          {p.username != null && <Row label="Username" value={String(p.username)} />}
+          {p.role != null && <Row label="Role" value={String(p.role).replace(/_/g, " ")} />}
         </div>
       );
     }
@@ -230,7 +233,7 @@ function PayloadRenderer({ eventType, payload }: { eventType: AuditEventType; pa
     case "DOCUMENT_DELETED": {
       return (
         <div className="space-y-1">
-          {(p.filename ?? p.original_filename) && (
+          {(p.filename != null || p.original_filename != null ) && (
             <Row label="File" value={String(p.filename ?? p.original_filename)} />
           )}
           <Row label="Doc ID" value={<ShortId id={String(p.doc_id ?? "")} />} />
@@ -241,7 +244,7 @@ function PayloadRenderer({ eventType, payload }: { eventType: AuditEventType; pa
     case "BIDDER_DOC_VIEWED": {
       return (
         <div className="space-y-1">
-          {(p.filename ?? p.original_filename) && (
+          {(p.filename != null || p.original_filename!= null) && (
             <Row label="File" value={String(p.filename ?? p.original_filename)} />
           )}
           <Row label="Bidder" value={<ShortId id={String(p.bidder_id ?? "")} />} />
