@@ -50,6 +50,7 @@ class CriterionOut(BaseModel):
     ambiguity_flags: Optional[list]
     is_approved: bool
     is_manually_added: bool
+    reviewer_notes: Optional[str] = None
     created_at: datetime
 
     class Config:
@@ -64,6 +65,11 @@ class CriterionUpdate(BaseModel):
     required_document: Optional[str] = None
     source_clause: Optional[str] = None
     source_page: Optional[int] = None
+    reviewer_notes: Optional[str] = None
+
+
+class ApprovePayload(BaseModel):
+    reviewer_notes: Optional[str] = None
 
 
 class CriterionCreate(BaseModel):
@@ -357,6 +363,7 @@ def approve_all_criteria(
 def approve_criterion(
     tender_id: str,
     criterion_id: str,
+    payload: Optional[ApprovePayload] = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(require_role(UserRole.SENIOR_OFFICER, UserRole.SYSTEM_ADMIN)),
 ):
@@ -367,6 +374,8 @@ def approve_criterion(
     if not criterion:
         raise HTTPException(status_code=404, detail="Criterion not found.")
     criterion.is_approved = True
+    if payload and payload.reviewer_notes:
+        criterion.reviewer_notes = payload.reviewer_notes
     db.commit()
     db.refresh(criterion)
     return criterion

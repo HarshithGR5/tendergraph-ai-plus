@@ -8,7 +8,8 @@ from sqlalchemy.orm import Session
 from backend.api.auth import get_current_user, require_role
 from backend.database import get_db
 from backend.models.tables import (
-    AuditEventType, Bidder, ReviewTask, ReviewTaskStatus, Tender, User, UserRole, VerdictValue
+    AuditEventType, Bidder, BidderDocument, BidderEvidence,
+    ReviewTask, ReviewTaskStatus, Tender, User, UserRole, VerdictValue
 )
 from backend.services import audit_service
 
@@ -30,6 +31,11 @@ class ReviewTaskOut(BaseModel):
     completed_at: Optional[datetime]
     resolution_notes: Optional[str]
     resolution_verdict: Optional[VerdictValue]
+    evidence_source_doc_name: Optional[str] = None
+    evidence_source_page: Optional[int] = None
+    evidence_extracted_text: Optional[str] = None
+    evidence_ocr_confidence: Optional[float] = None
+    evidence_extraction_confidence: Optional[float] = None
 
     class Config:
         from_attributes = True
@@ -38,6 +44,28 @@ class ReviewTaskOut(BaseModel):
 class ResolvePayload(BaseModel):
     resolution_verdict: VerdictValue
     resolution_notes: str
+
+
+def _enrich_task(task: ReviewTask, db: Session) -> ReviewTaskOut:
+    out = ReviewTaskOut.model_validate(task)
+    if task.bidder:
+        out.company_name = task.bidder.company_name
+    if task.verdict and task.verdict.criterion:
+        out.criterion_description = task.verdict.criterion.description[:200]
+    if task.verdict and task.verdict.evidence:
+        ev: BidderEvidence = task.verdict.evidence
+        out.evidence_source_page = ev.source_page
+        out.evidence_ocr_confidence = ev.ocr_confidence
+        out.evidence_extraction_confidence = ev.extraction_confidence
+        if ev.extracted_text:
+            out.evidence_extracted_text = ev.extracted_text[:400]
+        if ev.source_doc_id:
+            doc = db.query(BidderDocument).filter(
+                BidderDocument.doc_id == ev.source_doc_id
+            ).first()
+            if doc:
+                out.evidence_source_doc_name = doc.original_filename or doc.filename
+    return out
 
 
 # ── List review tasks: procurement + senior + admin ────────────────────────────
@@ -64,15 +92,7 @@ def list_review_tasks(
     query = query.order_by(ReviewTask.priority.asc(), ReviewTask.assigned_at.asc())
     tasks = query.all()
 
-    results = []
-    for task in tasks:
-        out = ReviewTaskOut.model_validate(task)
-        if task.bidder:
-            out.company_name = task.bidder.company_name
-        if task.verdict and task.verdict.criterion:
-            out.criterion_description = task.verdict.criterion.description[:200]
-        results.append(out)
-    return results
+    return [_enrich_task(t, db) for t in tasks]
 
 
 # ── Assign: procurement + senior + admin can assign tasks ─────────────────────
@@ -97,12 +117,7 @@ def assign_task(
         payload={"task_id": task_id, "assigned_to": current_user.user_id},
         tender_id=tender_id, bidder_id=task.bidder_id,
     )
-    out = ReviewTaskOut.model_validate(task)
-    if task.bidder:
-        out.company_name = task.bidder.company_name
-    if task.verdict and task.verdict.criterion:
-        out.criterion_description = task.verdict.criterion.description[:200]
-    return out
+    return _enrich_task(task, db)
 
 
 # ── Resolve/override: Senior Officer + Admin ONLY ─────────────────────────────
@@ -144,9 +159,4 @@ def resolve_task(
         tender_id=tender_id, bidder_id=task.bidder_id,
     )
 
-    out = ReviewTaskOut.model_validate(task)
-    if task.bidder:
-        out.company_name = task.bidder.company_name
-    if task.verdict and task.verdict.criterion:
-        out.criterion_description = task.verdict.criterion.description[:200]
-    return out
+    return _enrich_task(task, db)

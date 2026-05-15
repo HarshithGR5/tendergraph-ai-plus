@@ -376,6 +376,68 @@ def upload_document(
     return doc
 
 
+# ── Bulk document upload: BIDDER role only, own record only ───────────────────
+@router.post("/{bidder_id}/documents/bulk", response_model=List[DocumentOut], status_code=201)
+def upload_documents_bulk(
+    tender_id: str,
+    bidder_id: str,
+    background_tasks: BackgroundTasks,
+    doc_category: str = Form(None),
+    files: List[UploadFile] = File(...),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_role(UserRole.BIDDER)),
+):
+    """Upload multiple documents in one request. Each file is OCR-processed independently."""
+    bidder = db.query(Bidder).filter(Bidder.bidder_id == bidder_id, Bidder.tender_id == tender_id).first()
+    if not bidder:
+        raise HTTPException(status_code=404, detail="Bidder not found.")
+    if bidder.user_id != current_user.user_id:
+        raise HTTPException(status_code=403, detail="You can only upload documents to your own bidder profile.")
+    if bidder.submission_confirmed:
+        raise HTTPException(status_code=409, detail="Submission is locked. You cannot upload documents after confirming your submission.")
+    if not files:
+        raise HTTPException(status_code=400, detail="No files provided.")
+
+    created_docs = []
+    for file in files:
+        file.file.seek(0, 2)
+        file_size = file.file.tell()
+        file.file.seek(0)
+
+        storage_path = _save_upload(file, f"bidders/{bidder_id}")
+        ext = Path(file.filename).suffix.lower()
+
+        doc = BidderDocument(
+            bidder_id=bidder_id,
+            filename=Path(storage_path).name,
+            original_filename=file.filename,
+            file_type=ext.lstrip("."),
+            doc_category=doc_category,
+            storage_path=storage_path,
+            file_size_bytes=file_size,
+            ocr_status=OCRStatus.PENDING,
+            uploaded_by=current_user.user_id,
+        )
+        db.add(doc)
+        db.commit()
+        db.refresh(doc)
+
+        audit_service.log_event(
+            db=db,
+            event_type=AuditEventType.BIDDER_UPLOADED,
+            actor_id=current_user.user_id,
+            actor_type="HUMAN",
+            payload={"doc_id": doc.doc_id, "bidder_id": bidder_id, "filename": file.filename},
+            tender_id=tender_id,
+            bidder_id=bidder_id,
+        )
+
+        background_tasks.add_task(_process_document_bg, doc.doc_id)
+        created_docs.append(doc)
+
+    return created_docs
+
+
 # ── Documents list: internal staff OR own bidder ───────────────────────────────
 @router.get("/{bidder_id}/documents", response_model=List[DocumentOut])
 def list_documents(

@@ -66,6 +66,7 @@ export interface TenderCriterion {
   ambiguity_flags: string[];
   is_approved: boolean;
   is_manually_added: boolean;
+  reviewer_notes: string | null;
   created_at: string;
 }
 
@@ -170,6 +171,11 @@ export interface ReviewTask {
   completed_at: string | null;
   resolution_notes: string | null;
   resolution_verdict: VerdictValue | null;
+  evidence_source_doc_name: string | null;
+  evidence_source_page: number | null;
+  evidence_extracted_text: string | null;
+  evidence_ocr_confidence: number | null;
+  evidence_extraction_confidence: number | null;
 }
 
 export interface GlobalReviewTask extends ReviewTask {

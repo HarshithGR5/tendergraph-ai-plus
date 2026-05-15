@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { FileText, Users, Brain, AlertTriangle, CheckCircle, Activity } from "lucide-react";
 import Link from "next/link";
 import { tendersApi } from "@/lib/api/tenders";
+import { dashboardApi } from "@/lib/api/dashboard";
 import { MetricCard } from "@/components/dashboard/MetricCard";
 import { TenderStatusChart, VerdictDistributionChart } from "@/components/dashboard/ProcurementChart";
 import { VerdictBadge, StatusBadge } from "@/components/ui/badge";
@@ -22,9 +23,22 @@ export default function DashboardPage() {
     queryFn: tendersApi.list,
   });
 
-  const totalCriteria = tenders.reduce((s, t) => s + (t.criteria_count ?? 0), 0);
+  const { data: stats } = useQuery({
+    queryKey: ["dashboard-stats"],
+    queryFn: dashboardApi.getStats,
+    refetchInterval: 30_000,
+  });
+
   const processingCount = tenders.filter((t) => ["PROCESSING", "EVALUATION_IN_PROGRESS"].includes(t.status)).length;
+  const totalCriteria = tenders.reduce((s, t) => s + (t.criteria_count ?? 0), 0);
   const completeCount = tenders.filter((t) => t.status === "EVALUATION_COMPLETE").length;
+
+  const verdictData = {
+    eligible:     stats?.eligible     ?? 0,
+    not_eligible: stats?.not_eligible ?? 0,
+    review:       stats?.needs_review ?? 0,
+    pending:      stats?.pending      ?? 0,
+  };
 
   return (
     <div className="space-y-6">
@@ -53,10 +67,10 @@ export default function DashboardPage() {
           Array.from({ length: 4 }).map((_, i) => <CardSkeleton key={i} />)
         ) : (
           <>
-            <MetricCard label="Total Tenders" value={tenders.length} icon={FileText} color="blue" />
-            <MetricCard label="Total Criteria" value={totalCriteria} icon={CheckCircle} color="emerald" />
-            <MetricCard label="AI Processing" value={processingCount} icon={Brain} color="purple" />
-            <MetricCard label="Complete Evaluations" value={completeCount} icon={Activity} color="slate" />
+            <MetricCard label="Total Tenders"        value={tenders.length}    icon={FileText}    color="blue" />
+            <MetricCard label="Total Criteria"       value={totalCriteria}     icon={CheckCircle} color="emerald" />
+            <MetricCard label="AI Processing"        value={processingCount}   icon={Brain}       color="purple" />
+            <MetricCard label="Complete Evaluations" value={completeCount}     icon={Activity}    color="slate" />
           </>
         )}
       </div>
@@ -68,10 +82,32 @@ export default function DashboardPage() {
         ) : (
           <>
             <TenderStatusChart tenders={tenders} />
-            <VerdictDistributionChart data={{ eligible: completeCount, not_eligible: 0, review: 0, pending: processingCount }} />
+            <VerdictDistributionChart data={verdictData} />
           </>
         )}
       </div>
+
+      {/* Bidder summary row */}
+      {stats && (stats.total_bidders > 0 || stats.open_review_tasks > 0) && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <div className="bg-white border border-slate-200 rounded-xl p-4">
+            <p className="text-[11px] text-slate-400 font-medium mb-1">Total Bidders</p>
+            <p className="text-2xl font-bold text-slate-800">{stats.total_bidders}</p>
+          </div>
+          <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4">
+            <p className="text-[11px] text-emerald-600 font-medium mb-1">Eligible</p>
+            <p className="text-2xl font-bold text-emerald-700">{stats.eligible}</p>
+          </div>
+          <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+            <p className="text-[11px] text-red-600 font-medium mb-1">Not Eligible</p>
+            <p className="text-2xl font-bold text-red-700">{stats.not_eligible}</p>
+          </div>
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+            <p className="text-[11px] text-amber-600 font-medium mb-1">Open Reviews</p>
+            <p className="text-2xl font-bold text-amber-700">{stats.open_review_tasks}</p>
+          </div>
+        </div>
+      )}
 
       {/* Recent Tenders */}
       <div className="bg-white border border-slate-200 rounded-xl">
@@ -117,10 +153,10 @@ export default function DashboardPage() {
         <p className="text-xs font-semibold text-slate-500 mb-3 uppercase tracking-wider">System Architecture Principle</p>
         <div className="flex items-center gap-3 flex-wrap">
           {[
-            { icon: "🤖", label: "AI Extracts", desc: "GPT-4o OCR + structured evidence extraction" },
+            { icon: "🤖", label: "AI Extracts",        desc: "GPT-4o OCR + structured evidence extraction" },
             { icon: "⚖️", label: "Rule Engine Decides", desc: "Deterministic Python rules — never AI direct verdict" },
-            { icon: "👤", label: "Human Reviews", desc: "Ambiguous cases escalated automatically" },
-            { icon: "🔒", label: "Audit Records", desc: "SHA-256 hash-chained immutable event log" },
+            { icon: "👤", label: "Human Reviews",       desc: "Ambiguous cases escalated automatically" },
+            { icon: "🔒", label: "Audit Records",       desc: "SHA-256 hash-chained immutable event log" },
           ].map(({ icon, label, desc }, i) => (
             <div key={label} className="flex items-center gap-2">
               <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-lg px-3 py-2">

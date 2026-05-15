@@ -254,7 +254,8 @@ def _generate_pdf(tender: Tender) -> bytes:
             header_block.append(_p("  |  ".join(meta_parts), label_s))
 
         ev_hdr = [[_p("Criterion", label_s), _p("Cat.", label_s),
-                   _p("Verdict", label_s), _p("Reason", label_s), _p("Conf.", label_s)]]
+                   _p("Verdict", label_s), _p("Reason", label_s),
+                   _p("Source Doc", label_s), _p("Pg.", label_s), _p("Conf.", label_s)]]
         ev_rows = []
         v_by_crit = {v.criterion_id: v for v in bidder.verdicts}
 
@@ -263,22 +264,36 @@ def _generate_pdf(tender: Tender) -> bytes:
             cat_str = c.category.value if hasattr(c.category, "value") else str(c.category)
             if v:
                 eff = (v.override_verdict or v.verdict).value
-                reason = v.reason[:280] + ("…" if len(v.reason) > 280 else "")
+                reason = v.reason[:200] + ("…" if len(v.reason) > 200 else "")
                 conf   = f"{v.confidence:.0%}" if v.confidence is not None else "—"
                 v_label = eff.replace("_", " ")
+                ev = v.evidence
+                if ev:
+                    doc_name = "—"
+                    if ev.source_doc_id and ev.source_document:
+                        raw = ev.source_document.original_filename or ev.source_document.filename
+                        doc_name = raw[:28] + "…" if len(raw) > 28 else raw
+                    ev_page = str(ev.source_page) if ev.source_page else "—"
+                else:
+                    doc_name = "—"
+                    ev_page  = "—"
             else:
-                eff     = "PENDING"
-                reason  = "Evaluation not yet triggered."
-                conf    = "—"
-                v_label = "NOT RUN"
+                eff      = "PENDING"
+                reason   = "Evaluation not yet triggered."
+                conf     = "—"
+                v_label  = "NOT RUN"
+                doc_name = "—"
+                ev_page  = "—"
 
-            desc = c.description[:75] + ("…" if len(c.description) > 75 else "")
+            desc = c.description[:60] + ("…" if len(c.description) > 60 else "")
             ev_rows.append([
                 _p(desc, cell_s), _p(cat_str[:10], label_s),
-                _p(v_label, cell_s), _p(reason, cell_s), _p(conf, label_s),
+                _p(v_label, cell_s), _p(reason, cell_s),
+                _p(doc_name, label_s), _p(ev_page, label_s), _p(conf, label_s),
             ])
 
-        ev_cw = [PAGE_W * 0.24, PAGE_W * 0.10, PAGE_W * 0.11, PAGE_W * 0.46, PAGE_W * 0.09]
+        ev_cw = [PAGE_W * 0.19, PAGE_W * 0.09, PAGE_W * 0.10, PAGE_W * 0.37,
+                 PAGE_W * 0.15, PAGE_W * 0.04, PAGE_W * 0.06]
         ev_style_cmds = [
             ("BACKGROUND",    (0, 0), (-1, 0), colors.HexColor("#334155")),
             ("TEXTCOLOR",     (0, 0), (-1, 0), colors.white),

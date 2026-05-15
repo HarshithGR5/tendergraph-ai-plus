@@ -1,0 +1,520 @@
+{
+  "info": {
+    "name": "TenderGraph AI+ API",
+    "description": "Complete API collection for TenderGraph AI+ — AI-Powered Tender Evaluation & Bidder Eligibility Platform.\n\nBase URL: http://localhost:8000\n\nAuthentication: Bearer JWT. Use the Login request to get a token, then set it in the `token` collection variable.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_postman_id": "tendergraph-api-v1"
+  },
+  "variable": [
+    { "key": "base_url", "value": "http://localhost:8000", "type": "string" },
+    { "key": "token",    "value": "",                      "type": "string" },
+    { "key": "tender_id","value": "",                      "type": "string" },
+    { "key": "bidder_id","value": "",                      "type": "string" },
+    { "key": "doc_id",   "value": "",                      "type": "string" },
+    { "key": "verdict_id","value": "",                     "type": "string" },
+    { "key": "task_id",  "value": "",                      "type": "string" },
+    { "key": "report_id","value": "",                      "type": "string" }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+  },
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/health",
+            "description": "Verify the API server is running."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Register",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/auth/register",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"officer1\",\n  \"password\": \"password123\",\n  \"full_name\": \"Procurement Officer\",\n  \"role\": \"PROCUREMENT_OFFICER\"\n}"
+            },
+            "description": "Roles: BIDDER, PROCUREMENT_OFFICER, SENIOR_OFFICER, SYSTEM_ADMIN, AUDIT_REVIEWER"
+          }
+        },
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var json = pm.response.json();",
+                  "if (json.access_token) {",
+                  "  pm.collectionVariables.set('token', json.access_token);",
+                  "  console.log('Token saved to collection variable');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/auth/login",
+            "header": [{ "key": "Content-Type", "value": "application/x-www-form-urlencoded" }],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                { "key": "username", "value": "admin" },
+                { "key": "password", "value": "admin123" }
+              ]
+            },
+            "description": "Returns JWT access_token. Auto-saves to {{token}} variable via test script."
+          }
+        },
+        {
+          "name": "Get Current User",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/auth/me",
+            "description": "Returns currently authenticated user info."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Dashboard",
+      "item": [
+        {
+          "name": "Get Dashboard Stats",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/dashboard/stats",
+            "description": "Aggregated verdict distribution (eligible/not eligible/needs review/pending), total bidders, open review task count, evaluation-complete tender count."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Tenders",
+      "item": [
+        {
+          "name": "List Tenders",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/tenders/",
+            "description": "List all tenders visible to the current user."
+          }
+        },
+        {
+          "name": "Upload Tender",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/tenders/",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "file", "type": "file", "description": "PDF or DOCX tender document" },
+                { "key": "title", "value": "Supply of IT Equipment 2025-26", "type": "text" },
+                { "key": "view_password", "value": "", "type": "text", "description": "Optional access password for officers" }
+              ]
+            },
+            "description": "Senior Officer / System Admin only. Triggers async AI criterion extraction."
+          }
+        },
+        {
+          "name": "Get Tender",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/tenders/{{tender_id}}",
+            "description": "Get tender details including status and criteria count."
+          }
+        },
+        {
+          "name": "Delete Tender",
+          "request": {
+            "method": "DELETE",
+            "url": "{{base_url}}/api/tenders/{{tender_id}}",
+            "description": "System Admin only. Permanently deletes tender and all related data."
+          }
+        },
+        {
+          "name": "List Criteria",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/tenders/{{tender_id}}/criteria",
+            "description": "List all extracted eligibility criteria for a tender."
+          }
+        },
+        {
+          "name": "Add Criterion Manually",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/tenders/{{tender_id}}/criteria",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"description\": \"Company must have minimum annual turnover of INR 10 crore\",\n  \"category\": \"FINANCIAL\",\n  \"threshold_json\": { \"value\": 10000000, \"unit\": \"INR\" },\n  \"required_document\": \"Audited Balance Sheet\",\n  \"source_clause\": \"3.1\",\n  \"source_page\": 5\n}"
+            }
+          }
+        },
+        {
+          "name": "Update Criterion",
+          "request": {
+            "method": "PATCH",
+            "url": "{{base_url}}/api/tenders/{{tender_id}}/criteria/{{criterion_id}}",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reviewer_notes\": \"Threshold confirmed against Finance Dept guidelines. Minimum 3 years of audited accounts required.\",\n  \"status\": \"APPROVED\"\n}"
+            },
+            "description": "Update criterion fields including reviewer_notes. Senior+ only."
+          }
+        },
+        {
+          "name": "Approve Single Criterion",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/tenders/{{tender_id}}/criteria/{{criterion_id}}/approve",
+            "description": "Approve a single extracted criterion. Senior+ only."
+          }
+        },
+        {
+          "name": "Approve All Criteria",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/tenders/{{tender_id}}/criteria/approve-all",
+            "description": "Approve all pending criteria in one operation. Senior+ only."
+          }
+        },
+        {
+          "name": "Delete Criterion",
+          "request": {
+            "method": "DELETE",
+            "url": "{{base_url}}/api/tenders/{{tender_id}}/criteria/{{criterion_id}}",
+            "description": "Delete an extracted criterion. Senior+ only."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Bidders",
+      "item": [
+        {
+          "name": "List Bidders",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/tenders/{{tender_id}}/bidders/",
+            "description": "List all registered bidders for a tender. Officers only."
+          }
+        },
+        {
+          "name": "Self-Register as Bidder",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/tenders/{{tender_id}}/bidders/self-register",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"company_name\": \"M/s Example Technologies Pvt Ltd\",\n  \"gstin\": \"27AABCE1234F1Z5\",\n  \"pan\": \"AABCE1234F\",\n  \"contact_name\": \"Jane Smith\"\n}"
+            },
+            "description": "BIDDER role only. Register for participation in the tender."
+          }
+        },
+        {
+          "name": "Get My Registration",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/tenders/{{tender_id}}/bidders/my-registration",
+            "description": "BIDDER role — get own registration status for this tender."
+          }
+        },
+        {
+          "name": "Upload Document (Single)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/tenders/{{tender_id}}/bidders/{{bidder_id}}/documents",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "file", "type": "file", "description": "PDF, DOCX, PNG, or JPG" },
+                { "key": "doc_category", "value": "Financial Statement", "type": "text" }
+              ]
+            },
+            "description": "BIDDER only. Triggers async OCR processing."
+          }
+        },
+        {
+          "name": "Upload Documents (Bulk)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/tenders/{{tender_id}}/bidders/{{bidder_id}}/documents/bulk",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "files", "type": "file", "description": "First file" },
+                { "key": "files", "type": "file", "description": "Second file (repeat for each file)" },
+                { "key": "doc_category", "value": "Compliance Documents", "type": "text" }
+              ]
+            },
+            "description": "BIDDER only. Upload multiple documents at once. Each is OCR-processed individually. Returns list of created document records."
+          }
+        },
+        {
+          "name": "Delete Document",
+          "request": {
+            "method": "DELETE",
+            "url": "{{base_url}}/api/tenders/{{tender_id}}/bidders/{{bidder_id}}/documents/{{doc_id}}",
+            "description": "BIDDER only. Only allowed before submission is confirmed (draft state)."
+          }
+        },
+        {
+          "name": "Confirm Submission (Lock)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/tenders/{{tender_id}}/bidders/{{bidder_id}}/confirm-submission",
+            "description": "BIDDER only. Locks the submission — no further document changes allowed. Triggers KYC verification automatically."
+          }
+        },
+        {
+          "name": "Trigger Evaluation (Single Bidder)",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/tenders/{{tender_id}}/bidders/{{bidder_id}}/evaluate",
+            "description": "Procurement Officer+. Triggers AI extraction + rule engine evaluation for one bidder."
+          }
+        },
+        {
+          "name": "Evaluate All Bidders",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/tenders/{{tender_id}}/bidders/evaluate-all",
+            "description": "Procurement Officer+. Triggers evaluation for all registered bidders in one call. Returns triggered_count."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Verdicts & Matrix",
+      "item": [
+        {
+          "name": "Get Bidder-Criterion Matrix",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/tenders/{{tender_id}}/matrix",
+            "description": "Returns full verdict matrix: each bidder × each criterion. Includes evidence, confidence, rule applied, override info."
+          }
+        },
+        {
+          "name": "Override Verdict",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/tenders/{{tender_id}}/bidders/{{bidder_id}}/verdicts/{{verdict_id}}/override",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"override_verdict\": \"ELIGIBLE\",\n  \"override_reason\": \"Upon manual review, the submitted CA certificate clearly satisfies the turnover requirement.\"\n}"
+            },
+            "description": "Senior Officer / System Admin only. Overrides an AI verdict. Logged immutably to audit trail."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Review Queue",
+      "item": [
+        {
+          "name": "List Review Tasks (Tender)",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/tenders/{{tender_id}}/reviews/",
+            "description": "List NEEDS_MANUAL_REVIEW tasks for a specific tender."
+          }
+        },
+        {
+          "name": "List Review Tasks (Global)",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/reviews/",
+            "description": "Cross-tender review queue. Senior Officer+ only."
+          }
+        },
+        {
+          "name": "Resolve Review Task",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/tenders/{{tender_id}}/reviews/{{task_id}}/resolve",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"resolution_verdict\": \"ELIGIBLE\",\n  \"resolution_notes\": \"Reviewed original documents. All criteria satisfied. Overriding to ELIGIBLE.\"\n}"
+            },
+            "description": "Senior Officer only. Resolves a manual review task and updates the criterion verdict."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Reports",
+      "item": [
+        {
+          "name": "Generate PDF Report",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/tenders/{{tender_id}}/reports/generate",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"include_evidence\": true,\n  \"include_audit_references\": true\n}"
+            },
+            "description": "Generates and streams a PDF report. Includes Source Document and Page columns per verdict. Response is application/pdf — save to file."
+          }
+        },
+        {
+          "name": "List Reports",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/tenders/{{tender_id}}/reports/",
+            "description": "List all generated reports for a tender."
+          }
+        },
+        {
+          "name": "Download Report",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/tenders/{{tender_id}}/reports/{{report_id}}/download",
+            "description": "Re-stream an existing generated report as PDF."
+          }
+        }
+      ]
+    },
+    {
+      "name": "KYC",
+      "item": [
+        {
+          "name": "Verify GSTIN",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/kyc/verify-gstin",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"gstin\": \"27AABCE1234F1Z5\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Verify PAN",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/kyc/verify-pan",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pan\": \"AABCE1234F\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Check Debarment",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/kyc/check-debarment",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"company_name\": \"M/s Example Technologies Pvt Ltd\",\n  \"gstin\": \"27AABCE1234F1Z5\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Full KYC Check",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/api/kyc/full-check",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"company_name\": \"M/s Example Technologies Pvt Ltd\",\n  \"gstin\": \"27AABCE1234F1Z5\",\n  \"pan\": \"AABCE1234F\"\n}"
+            },
+            "description": "Runs GSTIN, PAN, debarment, and company status checks in one call. Returns overall_kyc_status: PASS | FAIL | REVIEW."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Audit Trail",
+      "item": [
+        {
+          "name": "Get Tender Audit Events",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/tenders/{{tender_id}}/audit/?limit=100&offset=0",
+              "query": [
+                { "key": "limit", "value": "100" },
+                { "key": "offset", "value": "0" },
+                { "key": "event_type", "value": "", "disabled": true }
+              ]
+            },
+            "description": "Paginated audit events for a specific tender. Filter by event_type: TENDER_UPLOADED, VERDICT_EMITTED, HUMAN_OVERRIDE_APPLIED, REPORT_EXPORTED, etc."
+          }
+        },
+        {
+          "name": "Verify Hash Chain",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/tenders/{{tender_id}}/audit/verify",
+            "description": "Verifies the SHA-256 hash chain for all audit events in the tender. Returns verified: true/false and event count."
+          }
+        },
+        {
+          "name": "Get Global Audit Events",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/audit/?limit=200&offset=0",
+              "query": [
+                { "key": "limit",  "value": "200" },
+                { "key": "offset", "value": "0" }
+              ]
+            },
+            "description": "Cross-tender global audit trail. Admin / Audit Reviewer only."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Bidder Portal",
+      "item": [
+        {
+          "name": "My Submissions",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/portal/my-submissions",
+            "description": "BIDDER only. List all tenders the bidder has registered for, with submission status and verdict."
+          }
+        },
+        {
+          "name": "Open Tenders",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/portal/open-tenders",
+            "description": "BIDDER only. List tenders currently open for registration."
+          }
+        }
+      ]
+    }
+  ]
+}

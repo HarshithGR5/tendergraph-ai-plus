@@ -155,6 +155,7 @@ class TenderCriterion(Base):
     ambiguity_flags = Column(JSON, default=list)
     is_approved = Column(Boolean, default=False)
     is_manually_added = Column(Boolean, default=False)
+    reviewer_notes = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     tender = relationship("Tender", back_populates="criteria")

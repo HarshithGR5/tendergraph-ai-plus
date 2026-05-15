@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { AlertTriangle, User, Clock, CheckCircle, XCircle, MessageSquare } from "lucide-react";
+import { AlertTriangle, User, Clock, CheckCircle, XCircle, MessageSquare, FileText, BookOpen } from "lucide-react";
 import { VerdictBadge, StatusBadge } from "@/components/ui/badge";
 import { formatDateTime, cn } from "@/lib/utils";
 import { reviewsApi } from "@/lib/api/reviews";
@@ -17,8 +17,10 @@ export function ReviewTaskCard({ task, tenderId, onUpdated }: Props) {
   const [notes, setNotes] = useState("");
   const [showResolve, setShowResolve] = useState(false);
   const [assigning, setAssigning] = useState(false);
+  const [showEvidence, setShowEvidence] = useState(false);
 
   const canResolve = user?.role === "SENIOR_OFFICER" || user?.role === "SYSTEM_ADMIN";
+  const hasEvidence = !!(task.evidence_source_doc_name || task.evidence_source_page || task.evidence_extracted_text);
 
   async function assign() {
     setAssigning(true);
@@ -69,6 +71,68 @@ export function ReviewTaskCard({ task, tenderId, onUpdated }: Props) {
           <p className="text-[11px] font-semibold text-slate-500 mb-1">Escalation Reason</p>
           <p className="text-xs text-slate-700 leading-relaxed">{task.reason_for_review}</p>
         </div>
+
+        {/* Evidence citation block */}
+        {hasEvidence && (
+          <div className="mb-3">
+            <button
+              onClick={() => setShowEvidence(!showEvidence)}
+              className="flex items-center gap-1.5 text-[11px] font-semibold text-blue-600 hover:text-blue-700 transition-colors"
+            >
+              <FileText className="w-3 h-3" />
+              Evidence Citation
+              <span className={cn("text-[9px] ml-0.5 transition-transform inline-block", showEvidence ? "rotate-180" : "")}>▼</span>
+            </button>
+            {showEvidence && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                className="mt-2 bg-blue-50 border border-blue-100 rounded-lg p-3 space-y-2"
+              >
+                {task.evidence_source_doc_name && (
+                  <div className="flex items-start gap-1.5">
+                    <FileText className="w-3 h-3 text-blue-500 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <span className="text-[9px] font-semibold text-blue-400 uppercase tracking-wide block">Source Document</span>
+                      <span className="text-[11px] text-blue-800 font-medium">{task.evidence_source_doc_name}</span>
+                    </div>
+                  </div>
+                )}
+                {task.evidence_source_page && (
+                  <div className="flex items-center gap-1.5">
+                    <BookOpen className="w-3 h-3 text-blue-500 flex-shrink-0" />
+                    <span className="text-[9px] font-semibold text-blue-400 uppercase tracking-wide">Page</span>
+                    <span className="text-[11px] font-bold text-blue-800">{task.evidence_source_page}</span>
+                  </div>
+                )}
+                {(task.evidence_ocr_confidence != null || task.evidence_extraction_confidence != null) && (
+                  <div className="flex items-center gap-3">
+                    {task.evidence_ocr_confidence != null && (
+                      <span className="text-[9px] text-blue-500">
+                        OCR: <strong>{(task.evidence_ocr_confidence * 100).toFixed(0)}%</strong>
+                      </span>
+                    )}
+                    {task.evidence_extraction_confidence != null && (
+                      <span className="text-[9px] text-blue-500">
+                        Extraction: <strong>{(task.evidence_extraction_confidence * 100).toFixed(0)}%</strong>
+                      </span>
+                    )}
+                  </div>
+                )}
+                {task.evidence_extracted_text && (
+                  <div>
+                    <span className="text-[9px] font-semibold text-blue-400 uppercase tracking-wide block mb-1">Extracted Text</span>
+                    <p className="text-[10px] text-blue-900 leading-relaxed bg-white/60 rounded px-2 py-1.5 border border-blue-100 font-mono">
+                      {task.evidence_extracted_text.length > 300
+                        ? task.evidence_extracted_text.substring(0, 300) + "…"
+                        : task.evidence_extracted_text}
+                    </p>
+                  </div>
+                )}
+              </motion.div>
+            )}
+          </div>
+        )}
 
         <div className="flex items-center gap-4 text-[10px] text-slate-400">
           <span className="flex items-center gap-1"><Clock className="w-3 h-3" />{formatDateTime(task.assigned_at)}</span>

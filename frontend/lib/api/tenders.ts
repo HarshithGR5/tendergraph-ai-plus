@@ -29,8 +29,11 @@ export const tendersApi = {
     return data;
   },
 
-  approveCriterion: async (tenderId: string, criterionId: string): Promise<TenderCriterion> => {
-    const { data } = await apiClient.post<TenderCriterion>(`/api/tenders/${tenderId}/criteria/${criterionId}/approve`);
+  approveCriterion: async (tenderId: string, criterionId: string, reviewerNotes?: string): Promise<TenderCriterion> => {
+    const { data } = await apiClient.post<TenderCriterion>(
+      `/api/tenders/${tenderId}/criteria/${criterionId}/approve`,
+      reviewerNotes ? { reviewer_notes: reviewerNotes } : undefined
+    );
     return data;
   },
 

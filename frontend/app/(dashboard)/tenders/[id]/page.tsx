@@ -15,6 +15,7 @@ import { CriterionCard } from "@/components/tenders/CriterionCard";
 import { VerdictBadge, StatusBadge } from "@/components/ui/badge";
 import { TableSkeleton } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
+import { ConfirmModal } from "@/components/ui/modal";
 import { formatDate, formatCurrency, cn } from "@/lib/utils";
 import { toast } from "sonner";
 import { useAuthStore } from "@/lib/stores/authStore";
@@ -28,8 +29,10 @@ function BidderTenderView({ tenderId }: { tenderId: string }) {
   const [form, setForm] = useState({ company_name: "", gstin: "", pan: "", contact_name: "" });
   const [showForm, setShowForm] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<string | null>(null);
   const [docCategory, setDocCategory] = useState("");
   const [confirmingSubmission, setConfirmingSubmission] = useState(false);
+  const [showLockModal, setShowLockModal] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const { data: tender } = useQuery({
@@ -73,7 +76,12 @@ function BidderTenderView({ tenderId }: { tenderId: string }) {
 
   async function handleConfirmSubmission() {
     if (!registration) return;
-    if (!confirm("Lock your submission? After confirming, you cannot add or remove documents. KYC verification will run automatically.")) return;
+    setShowLockModal(true);
+  }
+
+  async function doConfirmSubmission() {
+    if (!registration) return;
+    setShowLockModal(false);
     setConfirmingSubmission(true);
     try {
       await biddersApi.confirmSubmission(tenderId, registration.bidder_id);
@@ -86,22 +94,35 @@ function BidderTenderView({ tenderId }: { tenderId: string }) {
   }
 
   async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file || !registration) return;
-    const fd = new FormData();
-    fd.append("file", file);
-    if (docCategory) fd.append("doc_category", docCategory);
+    const files = Array.from(e.target.files ?? []);
+    if (!files.length || !registration) return;
     setUploading(true);
     try {
-      await biddersApi.uploadDocument(tenderId, registration.bidder_id, fd);
-      toast.success(`${file.name} uploaded — OCR processing started`);
+      if (files.length === 1) {
+        setUploadProgress(`Uploading ${files[0].name}…`);
+        const fd = new FormData();
+        fd.append("file", files[0]);
+        if (docCategory) fd.append("doc_category", docCategory);
+        await biddersApi.uploadDocument(tenderId, registration.bidder_id, fd);
+        toast.success(`${files[0].name} uploaded — OCR processing started`);
+      } else {
+        setUploadProgress(`Uploading ${files.length} files…`);
+        const fd = new FormData();
+        files.forEach((f) => fd.append("files", f));
+        if (docCategory) fd.append("doc_category", docCategory);
+        await biddersApi.uploadDocumentsBulk(tenderId, registration.bidder_id, fd);
+        toast.success(`${files.length} files uploaded — OCR processing started`);
+      }
       queryClient.invalidateQueries({ queryKey: ["my-docs", tenderId, registration.bidder_id] });
       queryClient.invalidateQueries({ queryKey: ["my-submissions"] });
       if (fileRef.current) fileRef.current.value = "";
       setDocCategory("");
     } catch (e: any) {
       toast.error(e?.response?.data?.detail ?? "Upload failed");
-    } finally { setUploading(false); }
+    } finally {
+      setUploading(false);
+      setUploadProgress(null);
+    }
   }
 
   return (
@@ -194,18 +215,19 @@ function BidderTenderView({ tenderId }: { tenderId: string }) {
                     : "bg-blue-600 hover:bg-blue-500 text-white"
                 )}>
                   {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
-                  {uploading ? "Uploading…" : "Choose File"}
+                  {uploading ? (uploadProgress ?? "Uploading…") : "Choose Files"}
                   <input
                     ref={fileRef}
                     type="file"
                     accept=".pdf,.doc,.docx,.png,.jpg,.jpeg"
+                    multiple
                     className="hidden"
                     onChange={handleUpload}
                     disabled={uploading}
                   />
                 </label>
               </div>
-              <p className="text-[11px] text-slate-400 mt-2">Accepted: PDF, Word, PNG, JPG · Each upload is OCR-processed and locked to your account</p>
+              <p className="text-[11px] text-slate-400 mt-2">Accepted: PDF, Word, PNG, JPG · Select multiple files to upload in bulk · Each upload is OCR-processed</p>
             </div>
           )}
 
@@ -359,6 +381,17 @@ function BidderTenderView({ tenderId }: { tenderId: string }) {
           )}
         </div>
       ) : null}
+
+      <ConfirmModal
+        open={showLockModal}
+        title="Lock your submission?"
+        message="After confirming, you cannot add or remove documents. KYC verification will run automatically in the background."
+        confirmLabel="Confirm & Lock"
+        cancelLabel="Cancel"
+        variant="violet"
+        onConfirm={doConfirmSubmission}
+        onCancel={() => setShowLockModal(false)}
+      />
     </div>
   );
 }
@@ -384,10 +417,15 @@ function DocRow({
   onDeleted: () => void;
 }) {
   const [deleting, setDeleting] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
   const canDelete = !submissionConfirmed;
 
   async function handleDelete() {
-    if (!confirm(`Delete "${doc.original_filename ?? doc.filename}"? This cannot be undone.`)) return;
+    setShowDeleteModal(true);
+  }
+
+  async function doDelete() {
+    setShowDeleteModal(false);
     setDeleting(true);
     try {
       await biddersApi.deleteDocument(tenderId, bidderId, doc.doc_id);
@@ -399,30 +437,42 @@ function DocRow({
   }
 
   return (
-    <tr className="hover:bg-slate-50 transition-colors">
-      <td className="px-4 py-3">
-        <div className="flex items-center gap-2">
-          <FileText className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" />
-          <span className="text-sm text-slate-700 truncate max-w-[180px]">{doc.original_filename ?? doc.filename}</span>
-        </div>
-      </td>
-      <td className="px-4 py-3 text-xs text-slate-500">{doc.doc_category ?? "—"}</td>
-      <td className="px-4 py-3 text-xs text-slate-500">{doc.page_count ?? "—"}</td>
-      <td className="px-4 py-3"><OcrStatusBadge status={doc.ocr_status} /></td>
-      <td className="px-4 py-3">
-        {canDelete && (
-          <button
-            onClick={handleDelete}
-            disabled={deleting}
-            title="Delete document (available before submission is confirmed)"
-            className="flex items-center gap-1 text-[11px] text-red-500 hover:text-red-700 hover:bg-red-50 px-2 py-1 rounded-lg transition-colors disabled:opacity-50"
-          >
-            {deleting ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
-            {deleting ? "…" : "Delete"}
-          </button>
-        )}
-      </td>
-    </tr>
+    <>
+      <tr className="hover:bg-slate-50 transition-colors">
+        <td className="px-4 py-3">
+          <div className="flex items-center gap-2">
+            <FileText className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" />
+            <span className="text-sm text-slate-700 truncate max-w-[180px]">{doc.original_filename ?? doc.filename}</span>
+          </div>
+        </td>
+        <td className="px-4 py-3 text-xs text-slate-500">{doc.doc_category ?? "—"}</td>
+        <td className="px-4 py-3 text-xs text-slate-500">{doc.page_count ?? "—"}</td>
+        <td className="px-4 py-3"><OcrStatusBadge status={doc.ocr_status} /></td>
+        <td className="px-4 py-3">
+          {canDelete && (
+            <button
+              onClick={handleDelete}
+              disabled={deleting}
+              title="Delete document (available before submission is confirmed)"
+              className="flex items-center gap-1 text-[11px] text-red-500 hover:text-red-700 hover:bg-red-50 px-2 py-1 rounded-lg transition-colors disabled:opacity-50"
+            >
+              {deleting ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
+              {deleting ? "…" : "Delete"}
+            </button>
+          )}
+        </td>
+      </tr>
+      <ConfirmModal
+        open={showDeleteModal}
+        title="Delete document?"
+        message={`"${doc.original_filename ?? doc.filename}" will be permanently removed. This cannot be undone.`}
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        variant="danger"
+        onConfirm={doDelete}
+        onCancel={() => setShowDeleteModal(false)}
+      />
+    </>
   );
 }
 
@@ -643,9 +693,10 @@ export default function TenderDetailPage({ params }: { params: Promise<{ id: str
 function EvaluateAllButton({ tenderId, bidderCount }: { tenderId: string; bidderCount: number }) {
   const queryClient = useQueryClient();
   const [running, setRunning] = useState(false);
+  const [showModal, setShowModal] = useState(false);
 
-  async function evaluateAll() {
-    if (!confirm(`Run AI evaluation for all ${bidderCount} registered bidder${bidderCount !== 1 ? "s" : ""}? This uses API credits and may take several minutes.`)) return;
+  async function doEvaluateAll() {
+    setShowModal(false);
     setRunning(true);
     try {
       const result = await biddersApi.evaluateAll(tenderId);
@@ -657,14 +708,26 @@ function EvaluateAllButton({ tenderId, bidderCount }: { tenderId: string; bidder
   }
 
   return (
-    <button
-      onClick={evaluateAll}
-      disabled={running}
-      className="flex items-center gap-1.5 text-xs px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-semibold transition-colors disabled:opacity-60"
-    >
-      {running ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
-      {running ? "Queuing…" : "Evaluate All"}
-    </button>
+    <>
+      <button
+        onClick={() => setShowModal(true)}
+        disabled={running}
+        className="flex items-center gap-1.5 text-xs px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-semibold transition-colors disabled:opacity-60"
+      >
+        {running ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
+        {running ? "Queuing…" : "Evaluate All"}
+      </button>
+      <ConfirmModal
+        open={showModal}
+        title={`Evaluate all ${bidderCount} bidder${bidderCount !== 1 ? "s" : ""}?`}
+        message="This will use OpenAI API credits and may take several minutes. Each bidder will be processed by the AI extraction + rule engine pipeline."
+        confirmLabel="Run Evaluation"
+        cancelLabel="Cancel"
+        variant="primary"
+        onConfirm={doEvaluateAll}
+        onCancel={() => setShowModal(false)}
+      />
+    </>
   );
 }
 

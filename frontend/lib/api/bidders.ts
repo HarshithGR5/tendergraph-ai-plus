@@ -53,6 +53,15 @@ export const biddersApi = {
     return data;
   },
 
+  uploadDocumentsBulk: async (tenderId: string, bidderId: string, formData: FormData): Promise<BidderDocument[]> => {
+    const { data } = await apiClient.post<BidderDocument[]>(
+      `/api/tenders/${tenderId}/bidders/${bidderId}/documents/bulk`,
+      formData,
+      { headers: { "Content-Type": "multipart/form-data" } }
+    );
+    return data;
+  },
+
   listDocuments: async (tenderId: string, bidderId: string): Promise<BidderDocument[]> => {
     const { data } = await apiClient.get<BidderDocument[]>(`/api/tenders/${tenderId}/bidders/${bidderId}/documents`);
     return data;
